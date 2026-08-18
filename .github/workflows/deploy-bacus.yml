@@ -22,5 +22,17 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Bootstrap project if needed
+        shell: bash
+        run: |
+          if [ ! -d "/srv/bacus/apps/cosmic-rangers" ]; then
+            command -v add-bacus-project >/dev/null
+            add-bacus-project \
+              --name cosmic-rangers \
+              --domain cosmic-rangers.bacus.dev \
+              --repo niko009/cosmic-rangers \
+              --port 8080
+          fi
+
       - name: Deploy isolated project
         run: /usr/local/bin/bacus-project deploy cosmic-rangers "$GITHUB_WORKSPACE"

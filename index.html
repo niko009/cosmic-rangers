@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Cosmic Rangers</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="hidden">
+      <div class="hud-row">
+        <div><span>СЧЁТ</span><b id="score">0</b></div>
+        <div><span>ВОЛНА</span><b id="wave">1</b></div>
+        <div><span>РЕКОРД</span><b id="highScore">0</b></div>
+      </div>
+      <div class="bars">
+        <div class="bar"><label>HP</label><div class="bar-bg"><i id="hpBar"></i></div></div>
+        <div class="bar boss-bar hidden" id="bossWrap"><label id="bossName">BOSS</label><div class="bar-bg"><i id="bossBar"></i></div></div>
+      </div>
+      <div id="powerups"></div>
+      <div id="waveMessage" class="wave-message"></div>
+    </div>
+
+    <section id="menu" class="screen">
+      <div class="stars-title">✦ · ˚ · ✧ · ˚ · ✦</div>
+      <h1>COSMIC<br><strong>RANGERS</strong></h1>
+      <p class="subtitle">METEOR STRIKE</p>
+      <button id="playBtn">PLAY</button>
+      <button id="howBtn" class="secondary">HOW TO PLAY</button>
+      <p class="tip">WASD / ← ↑ → ↓ · SPACE · P · SHIFT</p>
+    </section>
+
+    <section id="pauseScreen" class="screen hidden">
+      <h2>ПАУЗА</h2>
+      <p>Нажми P или кнопку ниже</p>
+      <button id="resumeBtn">ПРОДОЛЖИТЬ</button>
+    </section>
+
+    <section id="gameOver" class="screen hidden">
+      <h2 id="endTitle">GAME OVER</h2>
+      <p id="endReason"></p>
+      <div class="result">
+        <span>СЧЁТ <b id="finalScore">0</b></span>
+        <span>ВОЛНА <b id="finalWave">1</b></span>
+      </div>
+      <button id="againBtn">ИГРАТЬ СНОВА</button>
+      <button id="menuBtn" class="secondary">МЕНЮ</button>
+    </section>
+
+    <section id="howScreen" class="screen hidden">
+      <h2>КАК ИГРАТЬ</h2>
+      <div class="how">
+        <p>🚀 <b>Движение:</b> WASD или стрелки</p>
+        <p>🔫 <b>Огонь:</b> SPACE или удерживай экранную кнопку</p>
+        <p>⚡ <b>Ускорение:</b> SHIFT</p>
+        <p>⏸️ <b>Пауза:</b> P</p>
+        <p>🔥 <b>Overcharge:</b> тройная пушка на 10 секунд</p>
+        <p>⚡ <b>Rapid Fire:</b> повышенная скорострельность</p>
+        <p>🛡️ <b>Shield:</b> временная защита</p>
+        <p>💚 <b>Repair:</b> восстановление HP</p>
+        <p>💥 <b>Nova:</b> взрыв, уничтожающий врагов рядом</p>
+      </div>
+      <button id="backBtn" class="secondary">НАЗАД</button>
+    </section>
+
+    <div id="touchControls" class="hidden">
+      <div class="touch-move">
+        <button data-key="ArrowLeft">◀</button>
+        <button data-key="ArrowUp">▲</button>
+        <button data-key="ArrowDown">▼</button>
+        <button data-key="ArrowRight">▶</button>
+      </div>
+      <button id="touchFire" class="fire">FIRE</button>
+    </div>
+  </div>
+
+  <script src="js/AppStorage.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/stars.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

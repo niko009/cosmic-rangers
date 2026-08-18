@@ -38,3 +38,7 @@ button.secondary{background:rgba(15,20,40,.85);border-color:#39405f}
 .fire{min-width:90px;width:90px;height:90px;border-radius:50%;padding:0;background:rgba(140,50,80,.65);border-color:#ff6682;pointer-events:auto}
 @media(max-width:700px){.hud-row{gap:12px}.hud-row div{min-width:72px}.bars{top:73px;left:15px;width:180px}.boss-bar{left:calc(50vw - 110px);width:220px}.screen{padding:20px}h2{font-size:32px}}
 @media(pointer:fine){#touchControls{display:none!important}}
+
+.upgrade-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:420px;width:90%;margin:0 auto}
+.upgrade-btn{min-width:0;width:100%;padding:12px 10px;font-size:13px;letter-spacing:1px;margin:0}
+@media(max-width:500px){.upgrade-grid{grid-template-columns:1fr}}

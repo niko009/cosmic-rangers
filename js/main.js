@@ -26,6 +26,7 @@ const pauseScreen = document.getElementById("pauseScreen");
 const gameOver = document.getElementById("gameOver");
 const hud = document.getElementById("hud");
 const touch = document.getElementById("touchControls");
+const upgradeScreen = document.getElementById("upgradeScreen");
 const touchFire = document.getElementById("touchFire");
 
 const ui = {
@@ -95,8 +96,18 @@ const ui = {
     bossWrap.classList.toggle("hidden", !g.boss);
     if (g.boss) bossBar.style.width = Math.max(0, (g.boss.hp / g.boss.maxHp) * 100) + "%";
   },
+  showUpgradeMenu(g) {
+    if (!upgradeScreen) return;
+    this.pauseScreen.classList.add("hidden");
+    upgradeScreen.classList.remove("hidden");
+    this.hud.classList.remove("hidden");
+  },
+  hideUpgradeMenu() {
+    if (upgradeScreen) upgradeScreen.classList.add("hidden");
+  },
   start() {
     [this.menu, this.gameOver, this.howScreen, this.pauseScreen].forEach(x => x.classList.add("hidden"));
+    if (upgradeScreen) upgradeScreen.classList.add("hidden");
     this.hud.classList.remove("hidden");
     this.touch.classList.remove("hidden");
     game.start();
@@ -174,7 +185,7 @@ if (muteBtn) {
 addEventListener("keydown", e => {
   game.keys[e.code] = true;
   if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"].includes(e.code)) e.preventDefault();
-  if (e.code === "KeyP") game.togglePause();
+  if (e.code === "KeyP" && !game.awaitingUpgrade) game.togglePause();
   if (e.code === "KeyM" && window.Sound) {
     Sound.toggleMute();
     updateMuteLabel();
@@ -217,3 +228,13 @@ document.querySelectorAll(".touch-move button").forEach(btn => {
 });
 
 game.draw();
+
+
+// Post-boss upgrade choices
+document.querySelectorAll("#upgradeChoices [data-upgrade]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const choice = btn.getAttribute("data-upgrade");
+    if (window.Sound) Sound.ui();
+    game.applyBossUpgrade(choice);
+  });
+});

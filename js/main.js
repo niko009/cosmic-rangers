@@ -41,6 +41,27 @@ const ui = {
     highScore.textContent = Math.max(AppStorage.getHighScore(), g.score);
     hpBar.style.width = Math.max(0, (g.player.hp / g.player.maxHp) * 100) + "%";
     powerups.innerHTML = "";
+
+    // Weapon status + progress
+    const wType = (g.player.weaponType || "laser").toUpperCase();
+    const wLv = g.player.weaponLevel || 1;
+    const wColors = { laser: "#53e8ff", plasma: "#c45cff", spread: "#ffd84d", missile: "#ff6b4a" };
+    const kills = g.player.kills || 0;
+    const wProg = wLv >= 5 ? "MAX" : `${kills % 12}/12`;
+    const wd = document.createElement("div");
+    wd.className = "power";
+    wd.style.color = wColors[g.player.weaponType] || "#53e8ff";
+    wd.textContent = `🔫 ${wType} LV.${wLv} (${wProg})`;
+    powerups.appendChild(wd);
+
+    const aLv = g.player.armorLevel || 1;
+    const aProg = aLv >= 5 ? "MAX" : `${kills % 15}/15`;
+    const ad = document.createElement("div");
+    ad.className = "power";
+    ad.style.color = "#7cffb2";
+    ad.textContent = `🛡 ARMOR LV.${aLv} (${aProg})`;
+    powerups.appendChild(ad);
+
     const powers = [
       ["overcharge", "🔥 OVERCHARGE"],
       ["rapid", "⚡ RAPID FIRE"],
@@ -86,23 +107,62 @@ const ui = {
 };
 window.ui = ui;
 
-playBtn.onclick = () => ui.start();
-againBtn.onclick = () => ui.start();
-resumeBtn.onclick = () => game.togglePause();
-menuBtn.onclick = () => ui.showMenu();
+function unlockAudio() {
+  if (window.Sound) Sound.unlock();
+}
+
+playBtn.onclick = () => {
+  unlockAudio();
+  if (window.Sound) Sound.ui();
+  ui.start();
+};
+againBtn.onclick = () => {
+  unlockAudio();
+  if (window.Sound) Sound.ui();
+  ui.start();
+};
+resumeBtn.onclick = () => {
+  if (window.Sound) Sound.ui();
+  game.togglePause();
+};
+menuBtn.onclick = () => {
+  if (window.Sound) Sound.ui();
+  ui.showMenu();
+};
 howBtn.onclick = () => {
+  if (window.Sound) Sound.ui();
   menu.classList.add("hidden");
   howScreen.classList.remove("hidden");
 };
 backBtn.onclick = () => {
+  if (window.Sound) Sound.ui();
   howScreen.classList.add("hidden");
   menu.classList.remove("hidden");
 };
+
+const muteBtn = document.getElementById("muteBtn");
+function updateMuteLabel() {
+  if (!muteBtn || !window.Sound) return;
+  muteBtn.textContent = Sound.isMuted() ? "🔇 MUTED" : "🔊 SOUND";
+}
+if (muteBtn) {
+  muteBtn.onclick = () => {
+    if (window.Sound) {
+      Sound.toggleMute();
+      updateMuteLabel();
+      if (!Sound.isMuted()) Sound.ui();
+    }
+  };
+}
 
 addEventListener("keydown", e => {
   game.keys[e.code] = true;
   if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"].includes(e.code)) e.preventDefault();
   if (e.code === "KeyP") game.togglePause();
+  if (e.code === "KeyM" && window.Sound) {
+    Sound.toggleMute();
+    updateMuteLabel();
+  }
 });
 addEventListener("keyup", e => {
   game.keys[e.code] = false;
@@ -126,6 +186,15 @@ document.querySelectorAll(".touch-move button").forEach(btn => {
   ["pointerup", "pointercancel", "pointerleave"].forEach(t =>
     btn.addEventListener(t, () => (game.keys[code] = false))
   );
+});
+
+// Unlock audio on first user gesture (browser policy)
+["pointerdown", "keydown"].forEach(ev => {
+  const once = () => {
+    unlockAudio();
+    removeEventListener(ev, once);
+  };
+  addEventListener(ev, once, { once: true });
 });
 
 game.draw();

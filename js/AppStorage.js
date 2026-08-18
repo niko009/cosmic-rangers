@@ -40,5 +40,18 @@ window.AppStorage = {
       const cur = this.getBestShipTier();
       if (tier > cur) localStorage.setItem("cosmic-rangers-best-tier", String(tier));
     } catch (e) {}
+  },
+  getMaxWeaponLevel() {
+    try {
+      const n = Number(localStorage.getItem("cosmic-rangers-max-weapon-level"));
+      return Math.min(5, Math.max(1, n || 1));
+    } catch (e) { return 1; }
+  },
+  setMaxWeaponLevel(level) {
+    try {
+      const cur = this.getMaxWeaponLevel();
+      const next = Math.min(5, Math.max(1, level));
+      if (next > cur) localStorage.setItem("cosmic-rangers-max-weapon-level", String(next));
+    } catch (e) {}
   }
 };

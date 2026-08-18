@@ -13,7 +13,7 @@ class Game{
   }
   resize(){this.canvas.width=innerWidth*devicePixelRatio;this.canvas.height=innerHeight*devicePixelRatio;this.ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);if(this.player)this.player.y=Math.min(innerHeight-80,this.player.y)}
   reset(){
-    this.player={x:innerWidth/2,y:innerHeight-100,r:18,hp:100,maxHp:100,speed:330,fire:0,rapid:0,overcharge:0,shield:0,weaponLevel:1,weaponType:"laser",weaponXP:0,clone:0,armorLevel:1,kills:0,shipTier:1,unlockedWeapons:(typeof AppStorage!=="undefined"?AppStorage.getUnlockedWeapons():["laser"])};
+    this.player={x:innerWidth/2,y:innerHeight-100,r:18,hp:100,maxHp:100,speed:330,fire:0,rapid:0,overcharge:0,shield:0,weaponLevel:(typeof AppStorage!=="undefined"?AppStorage.getMaxWeaponLevel():1),weaponType:"laser",weaponXP:0,clone:0,armorLevel:1,kills:0,shipTier:1,unlockedWeapons:(typeof AppStorage!=="undefined"?AppStorage.getUnlockedWeapons():["laser"])};
     this.bullets=[];this.enemyBullets=[];this.meteors=[];this.powerups=[];this.boss=null;this.score=0;this.wave=1;this.waveKills=0;this.waveTarget=8;this.waveTimer=1.5;this.spawnTimer=.3;this.shake=0;this.flash=0;this.running=true;this.paused=false;this.won=false;this.last=performance.now();
     this.bossesKilled=0;this.aggression=1;
   }
@@ -37,7 +37,7 @@ class Game{
       { guns: 2, dmgMul: 1.1,  rateMul: 1.05, angles: [-0.12, 0.12] },
       { guns: 3, dmgMul: 1.2,  rateMul: 1.1,  angles: [-0.2, 0, 0.2] },
       { guns: 4, dmgMul: 1.35, rateMul: 1.15, angles: [-0.28, -0.1, 0.1, 0.28] },
-      { guns: 5, dmgMul: 1.5,  rateMul: 1.2,  angles: [-0.34, -0.17, 0, 0.17, 0.34] }
+      { guns: 7, dmgMul: 1.5,  rateMul: 1.2,  angles: null }  // full-screen fan computed in shoot()
     ];
     return table[Math.min(5, Math.max(1, level))] || table[1];
   }
@@ -59,10 +59,21 @@ class Game{
     if (p.weaponLevel >= 5) return false;
     p.weaponLevel++;
     p.weaponXP = 0;
+    if (typeof AppStorage !== "undefined" && AppStorage.setMaxWeaponLevel) AppStorage.setMaxWeaponLevel(p.weaponLevel);
     this.showMessage("WEAPON LV." + p.weaponLevel);
     this.particles.sparkle(p.x, p.y, "#ffd84d", 22);
     if (window.Sound) Sound.powerup();
     return true;
+  }
+  enemyWeaponXP(m){
+    // XP by enemy weight
+    if (!m) return 1;
+    if (m.big || m.kind === "cruiser") return 5;
+    if (m.kind === "drone") return 4;
+    if (m.kind === "zigzag") return 3;
+    if (m.kind === "weaver") return 3;
+    if (m.kind === "fighter") return 2;
+    return 1;
   }
   addWeaponXP(amount=1){
     const p = this.player;
@@ -149,30 +160,54 @@ class Game{
     const level = Math.min(5, p.weaponLevel + (p.overcharge > 0 ? 1 : 0));
     const w = this.weaponStats(level);
     let type = p.weaponType || "laser";
-    let angles = w.angles.slice();
+    // At max weapon level: fan covers full screen width from player position
+    let angles;
+    if (level >= 5 || !w.angles) {
+      const reachY = Math.max(120, p.y - 40); // distance upward to cover
+      const halfW = Math.max(p.x, innerWidth - p.x);
+      const edge = Math.atan2(halfW, reachY); // angle to screen edge
+      const n = 7;
+      angles = [];
+      for (let i = 0; i < n; i++) {
+        const t = n === 1 ? 0.5 : i / (n - 1);
+        angles.push(-edge + t * 2 * edge);
+      }
+    } else {
+      angles = w.angles.slice();
+    }
     let speed = 620;
     let damage = 1 * w.dmgMul;
     let fireRate = (p.rapid > 0 ? 0.075 : 0.18) / w.rateMul;
 
+    // Rebalanced DPS (approx equal at LV3, different roles)
+    // Laser: baseline high RoF
+    // Plasma: ~same DPS, fewer shots, high alpha
+    // Spread: lower per-bullet, more coverage, slightly higher total DPS vs packs
+    // Missile: lower RoF, high damage + homing (best vs elites/boss)
     if (type === "plasma") {
-      speed = 400;
-      damage = 2.4 * w.dmgMul;
-      fireRate = (p.rapid > 0 ? 0.12 : 0.28) / w.rateMul;
-      if (level >= 4) angles = [-0.18, 0, 0.18];
-      else if (level >= 2) angles = [-0.12, 0.12];
+      speed = 440;
+      damage = 2.1 * w.dmgMul;
+      fireRate = (p.rapid > 0 ? 0.11 : 0.24) / w.rateMul;
+      if (level >= 5) { /* keep full-screen angles */ }
+      else if (level >= 4) angles = [-0.16, 0, 0.16];
+      else if (level >= 2) angles = [-0.1, 0.1];
       else angles = [0];
     } else if (type === "spread") {
-      speed = 540;
-      damage = 0.8 * w.dmgMul;
-      fireRate = (p.rapid > 0 ? 0.09 : 0.2) / w.rateMul;
-      angles = angles.map(a => a * 1.4);
-      if (level === 1) angles = [-0.15, 0.15];
+      speed = 560;
+      damage = 0.95 * w.dmgMul;
+      fireRate = (p.rapid > 0 ? 0.085 : 0.19) / w.rateMul;
+      if (level < 5) {
+        angles = angles.map(a => a * 1.35);
+        if (level === 1) angles = [-0.14, 0.14];
+      }
+      // level 5: already full-screen fan
     } else if (type === "missile") {
-      speed = 280;
-      damage = 3.2 * w.dmgMul;
-      fireRate = (p.rapid > 0 ? 0.18 : 0.38) / w.rateMul;
-      if (level >= 4) angles = [-0.2, 0, 0.2];
-      else if (level >= 2) angles = [-0.12, 0.12];
+      speed = 320;
+      damage = 2.8 * w.dmgMul;
+      fireRate = (p.rapid > 0 ? 0.15 : 0.32) / w.rateMul;
+      if (level >= 5) { /* keep full-screen angles */ }
+      else if (level >= 4) angles = [-0.18, 0, 0.18];
+      else if (level >= 2) angles = [-0.1, 0.1];
       else angles = [0];
     }
 
@@ -241,8 +276,8 @@ class Game{
     this.aggression = 1 + this.bossesKilled * 0.22;
     this.wave++;this.waveKills=0;this.waveTarget=7+this.wave*2;this.waveTimer=2.2;
 
-    // Ship tier upgrade after each boss
-    this.upgradeShipTier();
+    // Base ship tier bump (visual + heal); tactical pick via menu
+    this.upgradeShipTierBase();
 
     this.particles.burst(bx, by, "#ff4f72", 60, 420, { size: 5, type: "circle" });
     this.particles.burst(bx, by, "#ff9a45", 40, 350, { size: 3 });
@@ -253,25 +288,56 @@ class Game{
     this.flash = 0.5;
     this.flashColor = "#ff4f72";
     if(window.Sound) Sound.bossDie();
+
+    // Pause and open post-boss upgrade menu
+    this.paused = true;
+    this.awaitingUpgrade = true;
+    if (window.ui && window.ui.showUpgradeMenu) window.ui.showUpgradeMenu(this);
   }
-  upgradeShipTier(){
+  upgradeShipTierBase(){
     const p = this.player;
     p.shipTier = (p.shipTier || 1) + 1;
-    // Tactical bonuses
-    if (p.weaponLevel < 5) p.weaponLevel = Math.min(5, p.weaponLevel + 1);
-    if (p.armorLevel < 5) {
-      p.armorLevel = Math.min(5, p.armorLevel + 1);
-      const stats = this.armorStats(p.armorLevel);
-      p.maxHp = stats.maxHp;
-    }
-    p.hp = p.maxHp; // full repair after boss
+    p.hp = p.maxHp;
     p.speed = 330 + (p.shipTier - 1) * 18;
-    // Brief invulnerability feel via shield
     p.shield = Math.max(p.shield, 4);
     this.showMessage("SHIP TIER " + p.shipTier);
     this.particles.sparkle(p.x, p.y, "#53e8ff", 30);
     this.particles.sparkle(p.x, p.y, "#ffd84d", 18);
     this.particles.ring(p.x, p.y, "#53e8ff", 90);
+    if (typeof AppStorage !== "undefined" && AppStorage.setBestShipTier) AppStorage.setBestShipTier(p.shipTier);
+  }
+  applyBossUpgrade(choice){
+    const p = this.player;
+    if (choice === "weapon") {
+      if (!this.upgradeWeapon()) {
+        p.overcharge = Math.max(p.overcharge, 12);
+        this.showMessage("OVERCHARGE 12s");
+      }
+    } else if (choice === "armor") {
+      if (!this.upgradeArmor()) {
+        p.hp = p.maxHp;
+        this.showMessage("FULL REPAIR");
+      }
+    } else if (choice === "plasma") {
+      this.unlockWeaponType("plasma");
+    } else if (choice === "spread") {
+      this.unlockWeaponType("spread");
+    } else if (choice === "missile") {
+      this.unlockWeaponType("missile");
+    } else if (choice === "clone") {
+      p.clone = Math.max(p.clone || 0, 20);
+      this.showMessage("DUAL SHIP 20s");
+    } else if (choice === "shield") {
+      p.shield = Math.max(p.shield, 12);
+      this.showMessage("SHIELD 12s");
+    } else if (choice === "rapid") {
+      p.rapid = Math.max(p.rapid, 12);
+      this.showMessage("RAPID 12s");
+    }
+    this.awaitingUpgrade = false;
+    this.paused = false;
+    this.last = performance.now();
+    if (window.ui && window.ui.hideUpgradeMenu) window.ui.hideUpgradeMenu();
   }
   collisions(){
     const p=this.player;
@@ -326,7 +392,7 @@ class Game{
     this.player.kills++;
 
     // Progression: weapon every 12 kills, armor every 15 kills
-    this.addWeaponXP(1);
+    this.addWeaponXP(this.enemyWeaponXP(m));
     if (this.player.kills % 15 === 0) this.upgradeArmor();
 
     let col = "#5ad0ff";
@@ -491,5 +557,5 @@ class Game{
   }
   loop(t){if(!this.running)return;const dt=(t-this.last)/1000;this.last=t;this.update(dt);this.draw();this.raf=requestAnimationFrame(x=>this.loop(x))}
   start(){this.reset();this.raf=requestAnimationFrame(x=>this.loop(x))}
-  togglePause(){if(!this.running)return;this.paused=!this.paused;window.ui.pause(this.paused);if(!this.paused)this.last=performance.now()}
+  togglePause(){if(!this.running||this.awaitingUpgrade)return;this.paused=!this.paused;window.ui.pause(this.paused);if(!this.paused)this.last=performance.now()}
 }

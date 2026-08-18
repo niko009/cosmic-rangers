@@ -67,7 +67,9 @@
         <p>📦 Бонус <b>W</b> — +1 уровень · <b>Q</b> — сменить тип оружия</p>
         <p>🟣 Plasma · 🟡 Spread · 🚀 Missile — подбирай, чтобы открыть навсегда</p>
         <p>🛡 <b>Armor (A):</b> +макс. HP и снижение урона</p>
-        <p>📈 Оружие / 12 убийств · Броня / 15 убийств</p>
+        <p>📈 XP оружия зависит от силы врага · 12 XP = уровень</p>
+        <p>💾 Макс. уровень оружия сохраняется между играми</p>
+        <p>🎁 После босса — меню выбора улучшения</p>
         <p>🚀 <b>Ship Tier:</b> после босса корабль сильнее и меняет вид</p>
         <p>👿 После босса враги быстрее, живучее и злее</p>
         <p>⚠️ Враг ушёл за край экрана = урон (BREACH)</p>
@@ -75,6 +77,22 @@
         <p>🛸 Враги: истребители, крейсеры, Weaver, ZigZag, Drone</p>
       </div>
       <button id="backBtn" class="secondary">НАЗАД</button>
+    </section>
+
+
+    <section id="upgradeScreen" class="screen hidden">
+      <h2>УЛУЧШЕНИЕ</h2>
+      <p class="subtitle" style="margin:8px 0 18px">Выбери награду за босса</p>
+      <div class="upgrade-grid" id="upgradeChoices">
+        <button data-upgrade="weapon" class="upgrade-btn">🔫 ОРУЖИЕ +1</button>
+        <button data-upgrade="armor" class="upgrade-btn">🛡 БРОНЯ +1</button>
+        <button data-upgrade="plasma" class="upgrade-btn">🟣 PLASMA</button>
+        <button data-upgrade="spread" class="upgrade-btn">🟡 SPREAD</button>
+        <button data-upgrade="missile" class="upgrade-btn">🚀 MISSILE</button>
+        <button data-upgrade="clone" class="upgrade-btn">👥 CLONE 20с</button>
+        <button data-upgrade="shield" class="upgrade-btn">✨ SHIELD 12с</button>
+        <button data-upgrade="rapid" class="upgrade-btn">⚡ RAPID 12с</button>
+      </div>
     </section>
 
     <div id="touchControls" class="hidden">

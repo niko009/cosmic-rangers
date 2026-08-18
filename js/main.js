@@ -47,7 +47,8 @@ const ui = {
     const wLv = g.player.weaponLevel || 1;
     const wColors = { laser: "#53e8ff", plasma: "#c45cff", spread: "#ffd84d", missile: "#ff6b4a" };
     const kills = g.player.kills || 0;
-    const wProg = wLv >= 5 ? "MAX" : `${kills % 12}/12`;
+    const wXP = g.player.weaponXP || 0;
+    const wProg = wLv >= 5 ? "MAX" : `${wXP}/12`;
     const wd = document.createElement("div");
     wd.className = "power";
     wd.style.color = wColors[g.player.weaponType] || "#53e8ff";
@@ -61,6 +62,21 @@ const ui = {
     ad.style.color = "#7cffb2";
     ad.textContent = `🛡 ARMOR LV.${aLv} (${aProg})`;
     powerups.appendChild(ad);
+
+    const tier = g.player.shipTier || 1;
+    const td = document.createElement("div");
+    td.className = "power";
+    td.style.color = "#a0c4ff";
+    td.textContent = `🚀 SHIP TIER ${tier}`;
+    powerups.appendChild(td);
+
+    if ((g.player.clone || 0) > 0) {
+      const cd = document.createElement("div");
+      cd.className = "power";
+      cd.style.color = "#53e8ff";
+      cd.textContent = `👥 DUAL ${g.player.clone.toFixed(1)}s`;
+      powerups.appendChild(cd);
+    }
 
     const powers = [
       ["overcharge", "🔥 OVERCHARGE"],
@@ -162,6 +178,9 @@ addEventListener("keydown", e => {
   if (e.code === "KeyM" && window.Sound) {
     Sound.toggleMute();
     updateMuteLabel();
+  }
+  if (e.code === "KeyQ" && game.running && !game.paused) {
+    game.cycleWeapon();
   }
 });
 addEventListener("keyup", e => {

@@ -2,18 +2,20 @@ class Game{
   constructor(canvas){
     this.canvas=canvas;this.ctx=canvas.getContext("2d");this.resize();
     this.stars=new Starfield();this.particles=new ParticleSystem();
-    this.player={x:innerWidth/2,y:innerHeight-100,r:18,hp:100,maxHp:100,speed:330,fire:0,rapid:0,overcharge:0,shield:0,weaponLevel:1,weaponType:"laser",armorLevel:1,kills:0};
+    this.player={x:innerWidth/2,y:innerHeight-100,r:18,hp:100,maxHp:100,speed:330,fire:0,rapid:0,overcharge:0,shield:0,weaponLevel:1,weaponType:"laser",weaponXP:0,clone:0,armorLevel:1,kills:0,shipTier:1,unlockedWeapons:["laser"]};
     this.bullets=[];this.enemyBullets=[];this.meteors=[];this.powerups=[];this.boss=null;
     this.score=0;this.wave=1;this.waveKills=0;this.waveTarget=8;this.waveTimer=1.5;
     this.spawnTimer=0;this.running=false;this.paused=false;this.won=false;this.shake=0;this.boost=false;
     this.flash=0;this.flashColor="#ff4f72";
+    this.bossesKilled=0;this.aggression=1;
     this.keys={};this.last=0;
     addEventListener("resize",()=>this.resize());
   }
   resize(){this.canvas.width=innerWidth*devicePixelRatio;this.canvas.height=innerHeight*devicePixelRatio;this.ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);if(this.player)this.player.y=Math.min(innerHeight-80,this.player.y)}
   reset(){
-    this.player={x:innerWidth/2,y:innerHeight-100,r:18,hp:100,maxHp:100,speed:330,fire:0,rapid:0,overcharge:0,shield:0,weaponLevel:1,weaponType:"laser",armorLevel:1,kills:0};
+    this.player={x:innerWidth/2,y:innerHeight-100,r:18,hp:100,maxHp:100,speed:330,fire:0,rapid:0,overcharge:0,shield:0,weaponLevel:1,weaponType:"laser",weaponXP:0,clone:0,armorLevel:1,kills:0,shipTier:1,unlockedWeapons:(typeof AppStorage!=="undefined"?AppStorage.getUnlockedWeapons():["laser"])};
     this.bullets=[];this.enemyBullets=[];this.meteors=[];this.powerups=[];this.boss=null;this.score=0;this.wave=1;this.waveKills=0;this.waveTarget=8;this.waveTimer=1.5;this.spawnTimer=.3;this.shake=0;this.flash=0;this.running=true;this.paused=false;this.won=false;this.last=performance.now();
+    this.bossesKilled=0;this.aggression=1;
   }
   // Armor tables: max HP and damage reduction (0..0.4)
   armorStats(level){
@@ -56,10 +58,39 @@ class Game{
     const p = this.player;
     if (p.weaponLevel >= 5) return false;
     p.weaponLevel++;
+    p.weaponXP = 0;
     this.showMessage("WEAPON LV." + p.weaponLevel);
     this.particles.sparkle(p.x, p.y, "#ffd84d", 22);
     if (window.Sound) Sound.powerup();
     return true;
+  }
+  addWeaponXP(amount=1){
+    const p = this.player;
+    if (p.weaponLevel >= 5) return;
+    p.weaponXP = (p.weaponXP || 0) + amount;
+    const need = 12;
+    if (p.weaponXP >= need) this.upgradeWeapon();
+  }
+  cycleWeapon(){
+    const p = this.player;
+    const order = ["laser","plasma","spread","missile"];
+    const unlocked = p.unlockedWeapons || ["laser"];
+    const avail = order.filter(t => unlocked.includes(t));
+    if (avail.length < 2) { this.showMessage("NEED MORE WEAPONS"); return; }
+    const i = avail.indexOf(p.weaponType);
+    p.weaponType = avail[(i + 1) % avail.length];
+    this.showMessage(p.weaponType.toUpperCase());
+    if (window.Sound) Sound.ui();
+  }
+  unlockWeaponType(type){
+    const p = this.player;
+    if (!p.unlockedWeapons) p.unlockedWeapons = ["laser"];
+    if (!p.unlockedWeapons.includes(type)) {
+      p.unlockedWeapons.push(type);
+      if (typeof AppStorage !== "undefined") AppStorage.unlockWeapon(type);
+      this.showMessage("UNLOCKED " + type.toUpperCase());
+    }
+    p.weaponType = type;
   }
   update(dt){
     if(!this.running||this.paused)return;
@@ -67,12 +98,13 @@ class Game{
     this.stars.update(dt,this.boost?1.8:1);
     this.particles.update(dt);
     const p=this.player;
-    p.rapid=Math.max(0,p.rapid-dt);p.overcharge=Math.max(0,p.overcharge-dt);p.shield=Math.max(0,p.shield-dt);
+    p.rapid=Math.max(0,p.rapid-dt);p.overcharge=Math.max(0,p.overcharge-dt);p.shield=Math.max(0,p.shield-dt);p.clone=Math.max(0,(p.clone||0)-dt);
     const dx=(this.keys.ArrowRight||this.keys.KeyD?1:0)-(this.keys.ArrowLeft||this.keys.KeyA?1:0);
     const dy=(this.keys.ArrowDown||this.keys.KeyS?1:0)-(this.keys.ArrowUp||this.keys.KeyW?1:0);
     const len=Math.hypot(dx,dy)||1;
     this.boost = !!(this.keys.ShiftLeft || this.keys.ShiftRight);
-    const speed = p.speed * (this.boost ? 1.65 : 1);
+    const tierSpeed = 1 + ((p.shipTier || 1) - 1) * 0.06;
+    const speed = p.speed * tierSpeed * (this.boost ? 1.65 : 1);
     p.x+=dx/len*speed*dt;p.y+=dy/len*speed*dt;p.x=Math.max(25,Math.min(innerWidth-25,p.x));p.y=Math.max(40,Math.min(innerHeight-35,p.y));
 
     // Engine trail particles
@@ -92,12 +124,25 @@ class Game{
       else m.update(dt);
     }
     for(const u of this.powerups)u.update(dt);
+    // Enemies that crossed the bottom edge deal damage
+    for (const m of this.meteors) {
+      if (m.leaked && !m._leakApplied) {
+        m._leakApplied = true;
+        this.onEnemyLeaked(m);
+      }
+    }
     this.bullets=this.bullets.filter(x=>!x.dead);this.enemyBullets=this.enemyBullets.filter(x=>!x.dead);this.meteors=this.meteors.filter(x=>!x.dead);this.powerups=this.powerups.filter(x=>!x.dead);
     if(this.boss){this.boss.update(dt,this)}else this.spawnWave(dt);
     this.collisions();
     this.shake=Math.max(0,this.shake-dt*3);
     this.flash=Math.max(0,this.flash-dt*4);
     this.updateHud();
+  }
+  cloneOffset(){
+    // Second ship sits to the side of the player
+    const p = this.player;
+    const side = 52 + Math.min(20, ((p.shipTier||1)-1)*4);
+    return { x: Math.max(30, Math.min(innerWidth-30, p.x - side)), y: p.y + 6 };
   }
   shoot(){
     const p = this.player;
@@ -113,7 +158,6 @@ class Game{
       speed = 400;
       damage = 2.4 * w.dmgMul;
       fireRate = (p.rapid > 0 ? 0.12 : 0.28) / w.rateMul;
-      // fewer barrels, heavier hits
       if (level >= 4) angles = [-0.18, 0, 0.18];
       else if (level >= 2) angles = [-0.12, 0.12];
       else angles = [0];
@@ -134,36 +178,49 @@ class Game{
 
     if (p.overcharge > 0) damage *= 1.5;
 
-    for (const a of angles) {
-      const vx = Math.sin(a) * speed;
-      const vy = -Math.cos(a) * speed;
-      this.bullets.push(new Bullet(p.x + Math.sin(a) * 6, p.y - 18, vx, vy, damage, type));
-      const flashColor = type === "plasma" ? "#c45cff" : type === "spread" ? "#ffd84d" : type === "missile" ? "#ff6b4a" : "#dffbff";
-      this.particles.trail(p.x + Math.sin(a) * 8, p.y - 22, -Math.PI / 2 + a, flashColor, 3, 180);
+    const origins = [{ x: p.x, y: p.y }];
+    if ((p.clone || 0) > 0) origins.push(this.cloneOffset());
+
+    for (const origin of origins) {
+      for (const a of angles) {
+        const vx = Math.sin(a) * speed;
+        const vy = -Math.cos(a) * speed;
+        this.bullets.push(new Bullet(origin.x + Math.sin(a) * 6, origin.y - 18, vx, vy, damage, type));
+        const flashColor = type === "plasma" ? "#c45cff" : type === "spread" ? "#ffd84d" : type === "missile" ? "#ff6b4a" : "#dffbff";
+        this.particles.trail(origin.x + Math.sin(a) * 8, origin.y - 22, -Math.PI / 2 + a, flashColor, 3, 180);
+      }
     }
     p.fire = fireRate;
     if (window.Sound) Sound.shoot();
   }
+
   spawnWave(dt){
     if(this.waveTimer>0){this.waveTimer-=dt;return}
     this.spawnTimer-=dt;
     if(this.waveKills>=this.waveTarget&&this.meteors.length===0){this.nextWave();return}
     if(this.spawnTimer<=0&&this.waveKills<this.waveTarget){
       this.meteors.push(this.spawnEnemy());
-      this.spawnTimer=Math.max(.22, .72-this.wave*.028);
+      // During clone: double enemy pressure
+      if ((this.player.clone||0) > 0 && this.waveKills < this.waveTarget) {
+        this.meteors.push(this.spawnEnemy());
+      }
+      let cd = Math.max(.22, .72-this.wave*.028);
+      if ((this.player.clone||0) > 0) cd *= 0.55;
+      this.spawnTimer = cd;
     }
   }
   spawnEnemy(){
     const w = this.wave;
+    const aggro = this.aggression || 1;
     const roll = Math.random();
-    // Unlock new types by wave
-    if (w >= 3 && roll < 0.22) return new Weaver(w);
-    if (w >= 5 && roll < 0.40) return new ZigZag(w);
-    if (w >= 7 && roll < 0.55) return new HomingDrone(w);
-    // Early waves: mostly meteors, later mixed
-    if (w >= 4 && roll < 0.18) return new Weaver(w);
-    if (w >= 6 && roll < 0.30) return new ZigZag(w);
-    return new Meteor(w);
+    // More aggressive enemies appear more often after bosses
+    const eliteChance = 0.18 + Math.min(0.35, (this.bossesKilled || 0) * 0.08);
+    if (w >= 3 && roll < eliteChance) return new Weaver(w, aggro);
+    if (w >= 5 && roll < eliteChance + 0.15) return new ZigZag(w, aggro);
+    if (w >= 7 && roll < eliteChance + 0.28) return new HomingDrone(w, aggro);
+    if (w >= 4 && roll < 0.18) return new Weaver(w, aggro);
+    if (w >= 6 && roll < 0.30) return new ZigZag(w, aggro);
+    return new Meteor(w, aggro);
   }
   nextWave(){
     if(this.wave%5===0){this.startBoss();return}
@@ -171,13 +228,22 @@ class Game{
     if(window.Sound) Sound.wave();
   }
   startBoss(){
-    this.showMessage("⚠ BOSS APPROACHING ⚠");this.boss=new Boss();
+    this.showMessage("⚠ BOSS APPROACHING ⚠");
+    this.boss=new Boss(this.bossesKilled || 0);
     if(window.Sound) Sound.bossAppear();
   }
   bossDefeated(){
     const bx = this.boss ? this.boss.x : innerWidth/2;
     const by = this.boss ? this.boss.y : 125;
-    this.score+=10000;this.boss=null;this.wave++;this.waveKills=0;this.waveTarget=7+this.wave*2;this.waveTimer=2;this.showMessage("BOSS DESTROYED");
+    this.score+=10000 + (this.bossesKilled || 0) * 2500;
+    this.boss=null;
+    this.bossesKilled = (this.bossesKilled || 0) + 1;
+    this.aggression = 1 + this.bossesKilled * 0.22;
+    this.wave++;this.waveKills=0;this.waveTarget=7+this.wave*2;this.waveTimer=2.2;
+
+    // Ship tier upgrade after each boss
+    this.upgradeShipTier();
+
     this.particles.burst(bx, by, "#ff4f72", 60, 420, { size: 5, type: "circle" });
     this.particles.burst(bx, by, "#ff9a45", 40, 350, { size: 3 });
     this.particles.burst(bx, by, "#ffd84d", 25, 280, { type: "circle" });
@@ -188,8 +254,32 @@ class Game{
     this.flashColor = "#ff4f72";
     if(window.Sound) Sound.bossDie();
   }
+  upgradeShipTier(){
+    const p = this.player;
+    p.shipTier = (p.shipTier || 1) + 1;
+    // Tactical bonuses
+    if (p.weaponLevel < 5) p.weaponLevel = Math.min(5, p.weaponLevel + 1);
+    if (p.armorLevel < 5) {
+      p.armorLevel = Math.min(5, p.armorLevel + 1);
+      const stats = this.armorStats(p.armorLevel);
+      p.maxHp = stats.maxHp;
+    }
+    p.hp = p.maxHp; // full repair after boss
+    p.speed = 330 + (p.shipTier - 1) * 18;
+    // Brief invulnerability feel via shield
+    p.shield = Math.max(p.shield, 4);
+    this.showMessage("SHIP TIER " + p.shipTier);
+    this.particles.sparkle(p.x, p.y, "#53e8ff", 30);
+    this.particles.sparkle(p.x, p.y, "#ffd84d", 18);
+    this.particles.ring(p.x, p.y, "#53e8ff", 90);
+  }
   collisions(){
     const p=this.player;
+    const ships = [{x:p.x,y:p.y,r:p.r}];
+    if ((p.clone||0) > 0) {
+      const c = this.cloneOffset();
+      ships.push({x:c.x,y:c.y,r:p.r});
+    }
     for(const b of this.bullets){
       for(const m of this.meteors){
         if(m.dead)continue;
@@ -206,16 +296,28 @@ class Game{
         if(this.boss.hp<=0)this.bossDefeated();
       }
     }
-    for(const eb of this.enemyBullets){if(Math.hypot(eb.x-p.x,eb.y-p.y)<p.r+eb.r){eb.dead=true;this.damage(eb.damage)}}
-    for(const m of this.meteors){
-      if(Math.hypot(m.x-p.x,m.y-p.y)<m.r+p.r){
-        m.dead=true;
-        const dmg = m.big ? 28 : (m.kind ? 22 : 18);
-        this.damage(dmg);
-        this.particles.burst(m.x,m.y, m.kind==="drone"?"#c45cff":"#9b7a92", 22, 200, {size:3});
+    for(const eb of this.enemyBullets){
+      for(const s of ships){
+        if(Math.hypot(eb.x-s.x,eb.y-s.y)<s.r+eb.r){eb.dead=true;this.damage(eb.damage);break}
       }
     }
-    for(const u of this.powerups){if(Math.hypot(u.x-p.x,u.y-p.y)<u.r+p.r){u.dead=true;this.applyPower(u.type)}}
+    for(const m of this.meteors){
+      if(m.dead)continue;
+      for(const s of ships){
+        if(Math.hypot(m.x-s.x,m.y-s.y)<m.r+s.r){
+          m.dead=true;
+          const dmg = m.big ? 28 : (m.kind ? 22 : 18);
+          this.damage(dmg);
+          this.particles.burst(m.x,m.y, m.kind==="drone"?"#c45cff":"#9b7a92", 22, 200, {size:3});
+          break;
+        }
+      }
+    }
+    for(const u of this.powerups){
+      for(const s of ships){
+        if(Math.hypot(u.x-s.x,u.y-s.y)<u.r+s.r){u.dead=true;this.applyPower(u.type);break}
+      }
+    }
   }
   destroyMeteor(m){
     m.dead=true;this.waveKills++;
@@ -224,7 +326,7 @@ class Game{
     this.player.kills++;
 
     // Progression: weapon every 12 kills, armor every 15 kills
-    if (this.player.kills % 12 === 0) this.upgradeWeapon();
+    this.addWeaponXP(1);
     if (this.player.kills % 15 === 0) this.upgradeArmor();
 
     let col = "#5ad0ff";
@@ -241,9 +343,16 @@ class Game{
     if (m.big || m.kind === "drone" || m.kind === "cruiser") this.particles.ring(m.x, m.y, col, m.big ? 70 : 50);
     if(window.Sound) (m.big || m.kind === "drone" || m.kind === "cruiser") ? Sound.explodeBig() : Sound.explodeSmall();
     if(Math.random() < (m.kind && m.kind !== "fighter" ? 0.24 : 0.15)){
-      const types=["overcharge","rapid","shield","repair","nova","weapon","plasma","spread","missile","armor"];
+      const types=["overcharge","rapid","shield","repair","nova","weapon","plasma","spread","missile","armor","clone"];
       this.powerups.push(new PowerUp(m.x,m.y,types[Math.floor(Math.random()*types.length)]));
     }
+  }
+  onEnemyLeaked(m){
+    const dmg = m.big ? 22 : (m.kind === "drone" ? 16 : m.kind ? 14 : 12);
+    this.damage(dmg);
+    this.flash = Math.max(this.flash, 0.25);
+    this.flashColor = "#ff9a45";
+    this.showMessage("BREACH!");
   }
   damage(amount){
     if(this.player.shield>0){
@@ -274,9 +383,15 @@ class Game{
     if(type==="weapon"){
       if(!this.upgradeWeapon()){p.overcharge=8;this.showMessage("OVERCHARGE");}
     }
-    if(type==="plasma"){p.weaponType="plasma";this.showMessage("PLASMA CANNON");}
-    if(type==="spread"){p.weaponType="spread";this.showMessage("SPREAD GUNS");}
-    if(type==="missile"){p.weaponType="missile";this.showMessage("MISSILES");}
+    if(type==="plasma"){this.unlockWeaponType("plasma");}
+    if(type==="spread"){this.unlockWeaponType("spread");}
+    if(type==="missile"){this.unlockWeaponType("missile");}
+    if(type==="clone"){
+      p.clone = 20;
+      this.showMessage("DUAL SHIP 20s");
+      this.particles.sparkle(p.x, p.y, "#53e8ff", 28);
+      this.particles.ring(p.x, p.y, "#53e8ff", 70);
+    }
     if(type==="nova"){
       for(const m of this.meteors){m.hp=0;this.destroyMeteor(m)}
       for(const e of this.enemyBullets)e.dead=true;
@@ -284,13 +399,13 @@ class Game{
       this.particles.ring(p.x,p.y,"#ff5cff",140);
       this.shake=.5;
     }
-    const sparkColor = type==="shield"?"#8d78ff":type==="repair"?"#4dff9b":type==="plasma"?"#c45cff":type==="missile"?"#ff6b4a":type==="spread"?"#ffd84d":"#ffd84d";
+    const sparkColor = type==="shield"?"#8d78ff":type==="repair"?"#4dff9b":type==="plasma"?"#c45cff":type==="missile"?"#ff6b4a":type==="clone"?"#53e8ff":type==="spread"?"#ffd84d":"#ffd84d";
     this.particles.sparkle(p.x, p.y, sparkColor, 18);
-    if(!["weapon","plasma","spread","missile","armor"].includes(type)) this.showMessage(type.toUpperCase());
+    if(!["weapon","plasma","spread","missile","armor","clone"].includes(type)) this.showMessage(type.toUpperCase());
     if(window.Sound) type === "shield" ? Sound.shield() : Sound.powerup();
   }
   end(win){
-    this.running=false;this.won=win;cancelAnimationFrame(this.raf);if(this.score>AppStorage.getHighScore())AppStorage.setHighScore(this.score);window.ui.showEnd(win,this.score,this.wave);
+    this.running=false;this.won=win;cancelAnimationFrame(this.raf);if(this.score>AppStorage.getHighScore())AppStorage.setHighScore(this.score);if(typeof AppStorage.setBestShipTier==="function")AppStorage.setBestShipTier(this.player.shipTier||1);window.ui.showEnd(win,this.score,this.wave);
     if(window.Sound) win ? Sound.victory() : Sound.gameOver();
   }
   showMessage(text){
@@ -312,19 +427,66 @@ class Game{
     }
   }
   drawPlayer(c){
-    const p=this.player;c.save();c.translate(p.x,p.y);if(this.boost){c.fillStyle="#ff9d4d";c.shadowBlur=20;c.shadowColor="#ff9d4d";c.beginPath();c.moveTo(-7,15);c.lineTo(0,38+Math.random()*12);c.lineTo(7,15);c.fill()}
-    c.shadowBlur=22;c.shadowColor="#53e8ff";c.fillStyle="#172944";c.strokeStyle="#53e8ff";c.lineWidth=2;
+    this.drawOneShip(c, this.player.x, this.player.y, 1);
+    if ((this.player.clone || 0) > 0) {
+      const o = this.cloneOffset();
+      this.drawOneShip(c, o.x, o.y, 0.75);
+    }
+  }
+  drawOneShip(c, x, y, alpha){
+    const p=this.player;
+    const tier = p.shipTier || 1;
+    c.save();c.translate(x,y);c.globalAlpha = alpha;
+    const scale = 1 + Math.min(0.35, (tier - 1) * 0.07);
+    c.scale(scale, scale);
+
+    if(this.boost){
+      c.fillStyle="#ff9d4d";c.shadowBlur=20;c.shadowColor="#ff9d4d";
+      c.beginPath();c.moveTo(-7,15);c.lineTo(0,38+Math.random()*12);c.lineTo(7,15);c.fill();
+      if(tier>=3){
+        c.beginPath();c.moveTo(-14,12);c.lineTo(-10,28+Math.random()*8);c.lineTo(-6,12);c.fill();
+        c.beginPath();c.moveTo(6,12);c.lineTo(10,28+Math.random()*8);c.lineTo(14,12);c.fill();
+      }
+    }
+
+    const hullColors = ["#172944","#1a3558","#1e2a60","#2a1848","#142838"];
+    const strokeColors = ["#53e8ff","#7ef9ff","#a0c4ff","#c45cff","#ffd84d"];
+    const hi = Math.min(hullColors.length - 1, tier - 1);
+    c.shadowBlur=22;c.shadowColor=strokeColors[hi];
+    c.fillStyle=hullColors[hi];c.strokeStyle=strokeColors[hi];c.lineWidth=2;
+
     c.beginPath();c.moveTo(0,-25);c.lineTo(19,18);c.lineTo(7,13);c.lineTo(0,22);c.lineTo(-7,13);c.lineTo(-19,18);c.closePath();c.fill();c.stroke();
-    // Armor plating layers at higher levels
+
+    if(tier>=2){
+      c.beginPath();c.moveTo(-19,10);c.lineTo(-28-tier,16);c.lineTo(-14,18);c.closePath();c.fill();c.stroke();
+      c.beginPath();c.moveTo(19,10);c.lineTo(28+tier,16);c.lineTo(14,18);c.closePath();c.fill();c.stroke();
+    }
+    if(tier>=4){
+      c.strokeStyle="#ffd84d";c.lineWidth=1.5;
+      c.beginPath();c.moveTo(-22,4);c.lineTo(-32,8);c.moveTo(22,4);c.lineTo(32,8);c.stroke();
+      c.strokeStyle=strokeColors[hi];c.lineWidth=2;
+    }
+
     if ((p.armorLevel || 1) >= 2) {
       c.strokeStyle = "#4dff9b";
-      c.globalAlpha = 0.35 + (p.armorLevel - 1) * 0.08;
+      c.globalAlpha = alpha * (0.35 + (p.armorLevel - 1) * 0.08);
       c.lineWidth = 1.5 + (p.armorLevel - 1) * 0.4;
       c.beginPath();c.moveTo(0,-22);c.lineTo(16,15);c.lineTo(0,18);c.lineTo(-16,15);c.closePath();c.stroke();
-      c.globalAlpha = 1;
+      c.globalAlpha = alpha;
     }
+
     c.fillStyle="#dffbff";c.beginPath();c.ellipse(0,-7,7,11,0,0,Math.PI*2);c.fill();
-    if(p.shield>0){c.strokeStyle="#8d78ff";c.globalAlpha=.7+.2*Math.sin(performance.now()/100);c.beginPath();c.arc(0,0,30,0,Math.PI*2);c.stroke()}
+    if(tier>=3){
+      c.fillStyle="rgba(83,232,255,0.5)";
+      c.fillRect(-10,6,20,3);
+    }
+    if(tier>=5){
+      c.strokeStyle="#ffd84d";c.lineWidth=2;
+      c.beginPath();c.moveTo(0,-25);c.lineTo(0,-36);c.stroke();
+      c.fillStyle="#ffd84d";c.beginPath();c.arc(0,-36,2.5,0,Math.PI*2);c.fill();
+    }
+
+    if(p.shield>0){c.strokeStyle="#8d78ff";c.globalAlpha=alpha*(.7+.2*Math.sin(performance.now()/100));c.beginPath();c.arc(0,0,28+tier*2,0,Math.PI*2);c.stroke()}
     c.restore();
   }
   loop(t){if(!this.running)return;const dt=(t-this.last)/1000;this.last=t;this.update(dt);this.draw();this.raf=requestAnimationFrame(x=>this.loop(x))}

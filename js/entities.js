@@ -66,15 +66,15 @@ class EnemyBullet{
 }
 // Basic alien ship (replaces meteors) — slight drift, alien design
 class AlienShip {
-  constructor(wave) {
-    const big = Math.random() < 0.14;
+  constructor(wave, aggro = 1) {
+    const big = Math.random() < (0.14 + Math.min(0.1, (aggro - 1) * 0.05));
     this.big = big;
     this.r = big ? 26 + Math.random() * 10 : 12 + Math.random() * 6;
     this.x = this.r + Math.random() * (innerWidth - this.r * 2);
     this.y = -this.r - 15;
-    this.vx = (Math.random() - 0.5) * (40 + wave * 5);
-    this.vy = 55 + Math.random() * 50 + wave * 6;
-    this.hp = big ? 5 + Math.floor(wave / 3) : 1 + Math.floor(wave / 7);
+    this.vx = (Math.random() - 0.5) * (40 + wave * 5) * aggro;
+    this.vy = (55 + Math.random() * 50 + wave * 6) * (0.85 + aggro * 0.15);
+    this.hp = Math.ceil((big ? 5 + Math.floor(wave / 3) : 1 + Math.floor(wave / 7)) * aggro);
     this.maxHp = this.hp;
     this.dead = false;
     this.t = 0;
@@ -90,7 +90,7 @@ class AlienShip {
     this.x += Math.sin(this.t * 1.5) * 12 * dt;
     if (this.x < -50) this.x = innerWidth + 50;
     if (this.x > innerWidth + 50) this.x = -50;
-    if (this.y > innerHeight + 60) this.dead = true;
+    if (this.y > innerHeight + 40) { this.leaked = true; this.dead = true; }
   }
   draw(ctx) {
     ctx.save();
@@ -179,27 +179,27 @@ class AlienShip {
 const Meteor = AlienShip;
 // Sine-wave weaver — oscillates left-right while descending
 class Weaver {
-  constructor(wave) {
+  constructor(wave, aggro = 1) {
     this.r = 14 + Math.random() * 4;
     this.baseX = this.r + 40 + Math.random() * (innerWidth - this.r * 2 - 80);
     this.x = this.baseX;
     this.y = -this.r - 20;
-    this.amp = 40 + Math.random() * 50 + wave * 2;
-    this.freq = 1.8 + Math.random() * 1.4;
+    this.amp = (40 + Math.random() * 50 + wave * 2) * (0.9 + aggro * 0.1);
+    this.freq = (1.8 + Math.random() * 1.4) * Math.min(2, aggro);
     this.phase = Math.random() * Math.PI * 2;
-    this.vy = 70 + Math.random() * 40 + wave * 5;
-    this.hp = 2 + Math.floor(wave / 5);
+    this.vy = (70 + Math.random() * 40 + wave * 5) * (0.9 + aggro * 0.15);
+    this.hp = Math.ceil((2 + Math.floor(wave / 5)) * aggro);
     this.maxHp = this.hp;
     this.dead = false;
     this.t = 0;
     this.kind = "weaver";
-    this.score = 180;
+    this.score = Math.floor(180 * aggro);
   }
   update(dt) {
     this.t += dt;
     this.y += this.vy * dt;
     this.x = this.baseX + Math.sin(this.t * this.freq + this.phase) * this.amp;
-    if (this.y > innerHeight + 40) this.dead = true;
+    if (this.y > innerHeight + 40) { this.leaked = true; this.dead = true; }
   }
   draw(ctx) {
     ctx.save();
@@ -239,32 +239,33 @@ class Weaver {
 
 // Zig-zag fighter — changes horizontal direction periodically
 class ZigZag {
-  constructor(wave) {
+  constructor(wave, aggro = 1) {
     this.r = 15;
     this.x = 30 + Math.random() * (innerWidth - 60);
     this.y = -30;
-    this.vx = (Math.random() < 0.5 ? 1 : -1) * (120 + wave * 8);
-    this.vy = 55 + Math.random() * 35 + wave * 4;
-    this.switchTimer = 0.4 + Math.random() * 0.5;
-    this.hp = 3 + Math.floor(wave / 4);
+    this.vx = (Math.random() < 0.5 ? 1 : -1) * (120 + wave * 8) * aggro;
+    this.vy = (55 + Math.random() * 35 + wave * 4) * (0.9 + aggro * 0.12);
+    this.switchTimer = Math.max(0.18, (0.4 + Math.random() * 0.5) / aggro);
+    this.hp = Math.ceil((3 + Math.floor(wave / 4)) * aggro);
     this.maxHp = this.hp;
     this.dead = false;
     this.t = 0;
     this.kind = "zigzag";
-    this.score = 220;
+    this.score = Math.floor(220 * aggro);
+    this.aggro = aggro;
   }
   update(dt) {
     this.t += dt;
     this.switchTimer -= dt;
     if (this.switchTimer <= 0) {
       this.vx *= -1;
-      this.switchTimer = 0.35 + Math.random() * 0.55;
+      this.switchTimer = Math.max(0.18, (0.35 + Math.random() * 0.55) / (this.aggro || 1));
     }
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     if (this.x < 20) { this.x = 20; this.vx = Math.abs(this.vx); }
     if (this.x > innerWidth - 20) { this.x = innerWidth - 20; this.vx = -Math.abs(this.vx); }
-    if (this.y > innerHeight + 40) this.dead = true;
+    if (this.y > innerHeight + 40) { this.leaked = true; this.dead = true; }
   }
   draw(ctx) {
     ctx.save();
@@ -297,40 +298,52 @@ class ZigZag {
 
 // Homing drone — smoothly curves toward player while descending, occasional shot
 class HomingDrone {
-  constructor(wave) {
+  constructor(wave, aggro = 1) {
     this.r = 13;
     this.x = 40 + Math.random() * (innerWidth - 80);
     this.y = -25;
     this.vx = 0;
-    this.vy = 50 + Math.random() * 30 + wave * 3;
-    this.hp = 2 + Math.floor(wave / 6);
+    this.vy = (50 + Math.random() * 30 + wave * 3) * (0.9 + aggro * 0.12);
+    this.hp = Math.ceil((2 + Math.floor(wave / 6)) * aggro);
     this.maxHp = this.hp;
     this.dead = false;
     this.t = 0;
-    this.shotTimer = 1.2 + Math.random();
+    this.shotTimer = Math.max(0.4, (1.2 + Math.random()) / aggro);
     this.kind = "drone";
-    this.score = 250;
+    this.score = Math.floor(250 * aggro);
     this.turnSpeed = 90 + wave * 5;
+    this.aggro = aggro;
+    this.bulletSpeed = 160 * (0.9 + aggro * 0.2);
+    this.bulletDmg = Math.ceil(10 * aggro);
   }
   update(dt, game) {
     this.t += dt;
     if (game && game.player) {
       const dx = game.player.x - this.x;
-      const targetVx = Math.max(-160, Math.min(160, dx * 1.1));
-      // Smooth steering
-      this.vx += (targetVx - this.vx) * Math.min(1, dt * 2.5);
+      const steer = 1.1 * (this.aggro || 1);
+      const targetVx = Math.max(-160 * (this.aggro||1), Math.min(160 * (this.aggro||1), dx * steer));
+      this.vx += (targetVx - this.vx) * Math.min(1, dt * (2.5 + (this.aggro||1)));
     }
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     this.x = Math.max(20, Math.min(innerWidth - 20, this.x));
 
     this.shotTimer -= dt;
-    if (this.shotTimer <= 0 && game && this.y > 40 && this.y < innerHeight * 0.7) {
+    if (this.shotTimer <= 0 && game && this.y > 40 && this.y < innerHeight * 0.75) {
       const a = Math.atan2(game.player.y - this.y, game.player.x - this.x);
-      game.enemyBullets.push(new EnemyBullet(this.x, this.y + 10, Math.cos(a) * 160, Math.sin(a) * 160, 10));
-      this.shotTimer = 1.8 + Math.random() * 1.2;
+      const n = (this.aggro || 1) >= 1.5 ? 2 : 1;
+      for (let i = 0; i < n; i++) {
+        const spread = n > 1 ? (i - 0.5) * 0.25 : 0;
+        game.enemyBullets.push(new EnemyBullet(
+          this.x, this.y + 10,
+          Math.cos(a + spread) * this.bulletSpeed,
+          Math.sin(a + spread) * this.bulletSpeed,
+          this.bulletDmg
+        ));
+      }
+      this.shotTimer = Math.max(0.55, (1.8 + Math.random() * 1.2) / (this.aggro || 1));
     }
-    if (this.y > innerHeight + 40) this.dead = true;
+    if (this.y > innerHeight + 40) { this.leaked = true; this.dead = true; }
   }
   draw(ctx) {
     ctx.save();
@@ -369,34 +382,65 @@ class PowerUp{
   constructor(x,y,type){this.x=x;this.y=y;this.type=type;this.r=13;this.vy=55;this.dead=false;this.t=0}
   update(dt){this.y+=this.vy*dt;this.t+=dt;if(this.y>innerHeight+30)this.dead=true}
   draw(ctx){
-    const colors={overcharge:"#ff9d4d",rapid:"#53e8ff",shield:"#8d78ff",repair:"#4dff9b",nova:"#ff5cff",weapon:"#ffd84d",plasma:"#c45cff",spread:"#ffb86c",missile:"#ff6b4a",armor:"#7cffb2"};
-    const icons={overcharge:"⚡",rapid:"R",shield:"S",repair:"+",nova:"N",weapon:"W",plasma:"P",spread:"X",missile:"M",armor:"A"};
+    const colors={overcharge:"#ff9d4d",rapid:"#53e8ff",shield:"#8d78ff",repair:"#4dff9b",nova:"#ff5cff",weapon:"#ffd84d",plasma:"#c45cff",spread:"#ffb86c",missile:"#ff6b4a",armor:"#7cffb2",clone:"#53e8ff"};
+    const icons={overcharge:"⚡",rapid:"R",shield:"S",repair:"+",nova:"N",weapon:"W",plasma:"P",spread:"X",missile:"M",armor:"A",clone:"2"};
     ctx.save();ctx.translate(this.x,this.y);ctx.rotate(Math.sin(this.t*4)*.15);ctx.shadowBlur=18;ctx.shadowColor=colors[this.type];ctx.strokeStyle=colors[this.type];ctx.fillStyle="rgba(10,15,30,.9)";ctx.lineWidth=2;
     ctx.beginPath();ctx.arc(0,0,this.r,0,Math.PI*2);ctx.fill();ctx.stroke();
     ctx.fillStyle=colors[this.type];ctx.font="bold 14px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(icons[this.type],0,1);ctx.restore();
   }
 }
 class Boss{
-  constructor(){this.x=innerWidth/2;this.y=-120;this.r=74;this.hp=220;this.maxHp=220;this.dead=false;this.t=0;this.shotTimer=1;this.phase=1}
+  constructor(bossesKilled = 0){
+    this.tier = bossesKilled + 1;
+    const scale = 1 + bossesKilled * 0.35;
+    this.x=innerWidth/2;this.y=-120;this.r=74+Math.min(20,bossesKilled*4);
+    this.hp=Math.floor(220*scale);this.maxHp=this.hp;
+    this.dead=false;this.t=0;this.shotTimer=Math.max(0.35,1-bossesKilled*0.08);this.phase=1;
+    this.bulletSpeed=180+bossesKilled*25;
+    this.bulletDmg=Math.ceil(18+bossesKilled*4);
+  }
   update(dt,game){
     this.t+=dt;
     this.y=Math.min(125,this.y+100*dt);
-    this.x=innerWidth/2+Math.sin(this.t*.7)*Math.min(260,innerWidth*.32);
-    this.phase=this.hp<75?3:this.hp<145?2:1;
+    const sway = Math.min(260,innerWidth*.32)*(1+Math.min(0.3,(this.tier-1)*0.08));
+    this.x=innerWidth/2+Math.sin(this.t*(.7+this.tier*0.05))*sway;
+    const third=this.maxHp/3;
+    this.phase=this.hp<third?3:this.hp<third*2?2:1;
     this.shotTimer-=dt;
-    if(this.shotTimer<=0){this.shoot(game);this.shotTimer=this.phase===3?.45:this.phase===2?.75:1.05}
+    if(this.shotTimer<=0){
+      this.shoot(game);
+      const baseCd=this.phase===3?.45:this.phase===2?.75:1.05;
+      this.shotTimer=Math.max(0.28,baseCd/(0.85+this.tier*0.1));
+    }
   }
   shoot(game){
     const base=Math.atan2(game.player.y-this.y,game.player.x-this.x);
-    const count=this.phase===1?3:this.phase===2?5:7;
+    let count=this.phase===1?3:this.phase===2?5:7;
+    count=Math.min(11,count+Math.floor((this.tier-1)/2));
     const spread=this.phase===3?.65:.45;
-    for(let i=0;i<count;i++){const a=base+(i-(count-1)/2)*(spread/(count-1||1));game.enemyBullets.push(new EnemyBullet(this.x,this.y+45,Math.cos(a)*180,Math.sin(a)*180,18))}
+    for(let i=0;i<count;i++){
+      const a=base+(i-(count-1)/2)*(spread/(count-1||1));
+      game.enemyBullets.push(new EnemyBullet(this.x,this.y+45,Math.cos(a)*this.bulletSpeed,Math.sin(a)*this.bulletSpeed,this.bulletDmg));
+    }
+    // Extra ring shot at high tier phase 3
+    if(this.tier>=3 && this.phase===3 && Math.random()<0.4){
+      for(let i=0;i<8;i++){
+        const a=(i/8)*Math.PI*2;
+        game.enemyBullets.push(new EnemyBullet(this.x,this.y,Math.cos(a)*this.bulletSpeed*0.7,Math.sin(a)*this.bulletSpeed*0.7,this.bulletDmg));
+      }
+    }
   }
   draw(ctx){
-    ctx.save();ctx.translate(this.x,this.y);ctx.shadowBlur=35;ctx.shadowColor="#ff4f72";
-    ctx.fillStyle="#261a34";ctx.strokeStyle="#ff5b7d";ctx.lineWidth=3;
+    ctx.save();ctx.translate(this.x,this.y);
+    const s=1+Math.min(0.2,(this.tier-1)*0.04);
+    ctx.scale(s,s);
+    ctx.shadowBlur=35;ctx.shadowColor="#ff4f72";
+    ctx.fillStyle="#261a34";ctx.strokeStyle=this.tier>=3?"#ff9a45":"#ff5b7d";ctx.lineWidth=3;
     ctx.beginPath();ctx.moveTo(-72,30);ctx.lineTo(-48,-42);ctx.lineTo(-20,-58);ctx.lineTo(0,-38);ctx.lineTo(20,-58);ctx.lineTo(48,-42);ctx.lineTo(72,30);ctx.lineTo(35,18);ctx.lineTo(0,55);ctx.lineTo(-35,18);ctx.closePath();ctx.fill();ctx.stroke();
     ctx.fillStyle="#ff596f";for(const x of [-28,28]){ctx.beginPath();ctx.arc(x,-18,9,0,Math.PI*2);ctx.fill()}
-    ctx.fillStyle="#53e8ff";ctx.fillRect(-16,-2,32,8);ctx.restore();
+    if(this.tier>=2){ctx.beginPath();ctx.arc(0,-22,7,0,Math.PI*2);ctx.fill()}
+    ctx.fillStyle="#53e8ff";ctx.fillRect(-16,-2,32,8);
+    if(this.tier>=3){ctx.fillStyle="#ffd84d";ctx.fillRect(-20,8,40,4)}
+    ctx.restore();
   }
 }

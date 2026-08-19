@@ -73,10 +73,11 @@ const ui = {
     const wColors = { laser: "#53e8ff", plasma: "#c45cff", spread: "#ffd84d", missile: "#ff6b4a" };
     const kills = g.player.kills || 0;
     const wXP = g.player.weaponXP || 0;
-    const wProg = wLv >= 5 ? "MAX" : `${wXP}/12`;
+    const locked = (g.bossesKilled || 0) < 1;
+    const wProg = locked ? "LOCK" : (wLv >= 5 ? "MAX" : `${wXP}/12`);
     const wd = document.createElement("div");
     wd.className = "power";
-    wd.style.color = wColors[g.player.weaponType] || "#53e8ff";
+    wd.style.color = locked ? "#8899aa" : (wColors[g.player.weaponType] || "#53e8ff");
     wd.textContent = `🔫 ${wType} LV.${wLv} (${wProg})`;
     powerups.appendChild(wd);
 

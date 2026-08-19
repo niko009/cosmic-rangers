@@ -13,7 +13,7 @@ class Game{
   }
   resize(){this.canvas.width=innerWidth*devicePixelRatio;this.canvas.height=innerHeight*devicePixelRatio;this.ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);if(this.player)this.player.y=Math.min(innerHeight-80,this.player.y)}
   reset(){
-    this.player={x:innerWidth/2,y:innerHeight-100,r:18,hp:100,maxHp:100,speed:330,fire:0,rapid:0,overcharge:0,shield:0,weaponLevel:(typeof AppStorage!=="undefined"?AppStorage.getMaxWeaponLevel():1),weaponType:"laser",weaponXP:0,clone:0,armorLevel:1,kills:0,shipTier:1,unlockedWeapons:(typeof AppStorage!=="undefined"?AppStorage.getUnlockedWeapons():["laser"])};
+    this.player={x:innerWidth/2,y:innerHeight-100,r:18,hp:100,maxHp:100,speed:330,fire:0,rapid:0,overcharge:0,shield:0,weaponLevel:1,weaponType:"laser",weaponXP:0,clone:0,armorLevel:1,kills:0,shipTier:1,unlockedWeapons:(typeof AppStorage!=="undefined"?AppStorage.getUnlockedWeapons():["laser"])};
     this.bullets=[];this.enemyBullets=[];this.meteors=[];this.powerups=[];this.boss=null;this.score=0;this.wave=1;this.waveKills=0;this.waveTarget=8;this.waveTimer=1.5;this.spawnTimer=.3;this.shake=0;this.flash=0;this.running=true;this.paused=false;this.won=false;this.last=performance.now();
     this.bossesKilled=0;this.aggression=1;
   }
@@ -54,8 +54,13 @@ class Game{
     if (window.Sound) Sound.powerup();
     return true;
   }
-  upgradeWeapon(){
+  upgradeWeapon(fromBoss=false){
     const p = this.player;
+    // Until the first boss is beaten, weapon stays at LV.1
+    if (!fromBoss && (this.bossesKilled || 0) < 1) {
+      this.showMessage("WEAPON LOCKED");
+      return false;
+    }
     if (p.weaponLevel >= 5) return false;
     p.weaponLevel++;
     p.weaponXP = 0;
@@ -77,10 +82,12 @@ class Game{
   }
   addWeaponXP(amount=1){
     const p = this.player;
+    // No weapon XP before first boss — keeps early waves at LV.1
+    if ((this.bossesKilled || 0) < 1) return;
     if (p.weaponLevel >= 5) return;
     p.weaponXP = (p.weaponXP || 0) + amount;
     const need = 12;
-    if (p.weaponXP >= need) this.upgradeWeapon();
+    if (p.weaponXP >= need) this.upgradeWeapon(false);
   }
   cycleWeapon(){
     const p = this.player;
@@ -332,7 +339,7 @@ class Game{
   applyBossUpgrade(choice){
     const p = this.player;
     if (choice === "weapon") {
-      if (!this.upgradeWeapon()) {
+      if (!this.upgradeWeapon(true)) {
         p.overcharge = Math.max(p.overcharge, 12);
         this.showMessage("OVERCHARGE 12s");
       }
@@ -470,7 +477,12 @@ class Game{
       }
     }
     if(type==="weapon"){
-      if(!this.upgradeWeapon()){p.overcharge=8;this.showMessage("OVERCHARGE");}
+      if((this.bossesKilled||0)<1){
+        p.overcharge=Math.max(p.overcharge,8);
+        this.showMessage("OVERCHARGE");
+      } else if(!this.upgradeWeapon()){
+        p.overcharge=8;this.showMessage("OVERCHARGE");
+      }
     }
     if(type==="plasma"){this.unlockWeaponType("plasma");}
     if(type==="spread"){this.unlockWeaponType("spread");}

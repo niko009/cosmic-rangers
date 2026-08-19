@@ -147,9 +147,10 @@ const ui = {
   showEnd(win, s, w) {
     this.hud.classList.add("hidden");
     this.touch.classList.add("hidden");
+    if (typeof this.hideUpgradeMenu === "function") this.hideUpgradeMenu();
     this.gameOver.classList.remove("hidden");
     endTitle.textContent = win ? "VICTORY!" : "GAME OVER";
-    endReason.textContent = win ? "BOSS DESTROYED" : "Корабль уничтожен";
+    endReason.textContent = win ? "10 БОССОВ УНИЧТОЖЕНО — СЕКТОР ЗАЧИЩЕН" : "Корабль уничтожен";
     finalScore.textContent = s;
     finalWave.textContent = w;
   },

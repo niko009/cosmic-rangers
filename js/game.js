@@ -117,16 +117,17 @@ class Game{
     const speed = p.speed * tierSpeed * (this.boost ? 1.65 : 1);
 
     if (mode === "mouse" && this.mouse.active) {
-      // Smooth follow cursor
+      // Tight follow: almost 1:1 with cursor (slight lerp only for micro-jitter)
       const tx = Math.max(25, Math.min(innerWidth - 25, this.mouse.x));
       const ty = Math.max(40, Math.min(innerHeight - 35, this.mouse.y));
       const dxm = tx - p.x, dym = ty - p.y;
       const dist = Math.hypot(dxm, dym);
-      if (dist > 2) {
-        const step = Math.min(dist, speed * dt * 1.35);
-        p.x += (dxm / dist) * step;
-        p.y += (dym / dist) * step;
-        moving = true;
+      if (dist > 0.5) {
+        // Exponential catch-up: ~25x/s → feels locked to cursor
+        const k = 1 - Math.exp(-25 * dt);
+        p.x += dxm * k;
+        p.y += dym * k;
+        moving = dist > 3;
       }
     } else {
       const dx=(this.keys.ArrowRight||this.keys.KeyD?1:0)-(this.keys.ArrowLeft||this.keys.KeyA?1:0);

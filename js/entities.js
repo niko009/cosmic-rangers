@@ -440,41 +440,69 @@ class Boss{
     // Super wave attack cooldown
     this.waveTimer = 4.5 - Math.min(1.5, bossesKilled * 0.35);
     this.waveFlash = 0;
+    this.enraged = false;
+    this.rageAnnounced = false;
+    this.ragePulse = 0;
   }
   update(dt, game){
     this.t += dt;
     this.y = Math.min(125, this.y + 95 * dt);
-    const sway = Math.min(240, innerWidth * 0.30) * (1 + Math.min(0.25, (this.tier - 1) * 0.07));
-    this.x = innerWidth / 2 + Math.sin(this.t * (0.55 + this.tier * 0.04)) * sway;
+
+    // Rage phase under 25% HP
+    if (!this.enraged && this.hp > 0 && this.hp <= this.maxHp * 0.25) {
+      this.enraged = true;
+      if (!this.rageAnnounced) {
+        this.rageAnnounced = true;
+        if (game.showMessage) game.showMessage("🔥 RAGE");
+        if (game.particles) {
+          game.particles.ring(this.x, this.y, "#ff4f72", 120);
+          game.particles.burst(this.x, this.y, "#ff4f72", 40, 280, { type: "circle", size: 4 });
+          game.particles.burst(this.x, this.y, "#ffd84d", 20, 200);
+        }
+        game.shake = Math.max(game.shake || 0, 0.55);
+        game.flash = Math.max(game.flash || 0, 0.4);
+        game.flashColor = "#ff4f72";
+        this.waveTimer = Math.min(this.waveTimer, 0.8);
+        this.shotTimer = Math.min(this.shotTimer, 0.25);
+        if (window.Sound && Sound.bossRage) Sound.bossRage();
+        else if (window.Sound && Sound.bossAppear) Sound.bossAppear();
+      }
+    }
+    this.ragePulse = this.enraged ? this.ragePulse + dt : 0;
+
+    const rageMul = this.enraged ? 1.55 : 1;
+    const sway = Math.min(240, innerWidth * 0.30) * (1 + Math.min(0.25, (this.tier - 1) * 0.07)) * (this.enraged ? 1.25 : 1);
+    const swaySpeed = (0.55 + this.tier * 0.04) * (this.enraged ? 1.7 : 1);
+    this.x = innerWidth / 2 + Math.sin(this.t * swaySpeed) * sway;
     const third = this.maxHp / 3;
     this.phase = this.hp < third ? 3 : this.hp < third * 2 ? 2 : 1;
     this.waveFlash = Math.max(0, this.waveFlash - dt);
-    this.shotTimer -= dt;
+    this.shotTimer -= dt * rageMul;
     if (this.shotTimer <= 0) {
       this.shoot(game);
       let baseCd = this.phase === 3 ? 0.55 : this.phase === 2 ? 0.85 : 1.15;
       if (this.tier === 1) baseCd *= 1.12;
-      this.shotTimer = Math.max(0.34, baseCd / (0.9 + this.tier * 0.08));
+      if (this.enraged) baseCd *= 0.55;
+      this.shotTimer = Math.max(0.22, baseCd / (0.9 + this.tier * 0.08));
     }
     // Super wave (only after boss has entered the arena)
     if (this.y >= 120) {
-      this.waveTimer -= dt;
+      this.waveTimer -= dt * (this.enraged ? 1.6 : 1);
       if (this.waveTimer <= 0) {
         this.shootWave(game);
         this.waveFlash = 0.45;
-        // More frequent in later phases/tiers
         let wcd = this.phase === 3 ? 3.2 : this.phase === 2 ? 4.0 : 5.0;
         wcd /= (0.95 + this.tier * 0.08);
-        this.waveTimer = Math.max(2.4, wcd);
-        if (window.Sound && Sound.bossAppear) { /* soft cue */ }
+        if (this.enraged) wcd *= 0.6;
+        this.waveTimer = Math.max(1.6, wcd);
       }
     }
   }
   shootWave(game){
     // Screen-wide downward wave — super attack
-    const n = 11 + Math.min(6, this.tier);
-    const speed = this.bulletSpeed * 0.72;
-    const dmg = Math.max(9, Math.round(this.bulletDmg * 0.85));
+    const n = 11 + Math.min(6, this.tier) + (this.enraged ? 4 : 0);
+    const speed = this.bulletSpeed * (this.enraged ? 0.85 : 0.72);
+    const dmg = Math.max(9, Math.round(this.bulletDmg * (this.enraged ? 1.0 : 0.85)));
     const y0 = this.y + 50;
     for (let i = 0; i < n; i++) {
       const t = n === 1 ? 0.5 : i / (n - 1);
@@ -504,6 +532,7 @@ class Boss{
     }
     if (game.showMessage) game.showMessage("⚠ WAVE");
     game.shake = Math.max(game.shake || 0, 0.35);
+    if (window.Sound && Sound.bossWave) Sound.bossWave();
   }
   shoot(game){
     const base = Math.atan2(game.player.y - this.y, game.player.x - this.x);
@@ -511,15 +540,18 @@ class Boss{
     let count = this.phase === 1 ? 3 : this.phase === 2 ? 4 : 5;
     if (this.tier >= 2) count += 1;
     if (this.tier >= 4) count += 1;
-    count = Math.min(9, count);
+    if (this.enraged) count += 2;
+    count = Math.min(11, count);
     const spread = this.phase === 3 ? 0.55 : 0.4;
+    const dmg = this.enraged ? Math.round(this.bulletDmg * 1.15) : this.bulletDmg;
+    const spd = this.bulletSpeed * (this.enraged ? 1.2 : 1);
     for (let i = 0; i < count; i++) {
       const a = base + (i - (count - 1) / 2) * (spread / (count - 1 || 1));
       game.enemyBullets.push(new EnemyBullet(
         this.x, this.y + 45,
-        Math.cos(a) * this.bulletSpeed,
-        Math.sin(a) * this.bulletSpeed,
-        this.bulletDmg
+        Math.cos(a) * spd,
+        Math.sin(a) * spd,
+        dmg
       ));
     }
     // Full ring only from 3rd boss onward, phase 3, lower damage
@@ -538,17 +570,34 @@ class Boss{
   }
   draw(ctx){
     ctx.save();ctx.translate(this.x,this.y);
-    const s=1+Math.min(0.2,(this.tier-1)*0.04);
+    const s=1+Math.min(0.2,(this.tier-1)*0.04)+(this.enraged?0.06:0);
     ctx.scale(s,s);
     const waveGlow = this.waveFlash > 0;
-    ctx.shadowBlur = waveGlow ? 50 : 35;
-    ctx.shadowColor = waveGlow ? "#ffd84d" : "#ff4f72";
-    ctx.fillStyle="#261a34";ctx.strokeStyle=waveGlow?"#ffd84d":(this.tier>=3?"#ff9a45":"#ff5b7d");ctx.lineWidth=3;
+    const rage = this.enraged;
+    ctx.shadowBlur = waveGlow ? 55 : rage ? 45 + Math.sin(this.ragePulse * 10) * 10 : 35;
+    ctx.shadowColor = waveGlow ? "#ffd84d" : rage ? "#ff2a4a" : "#ff4f72";
+    ctx.fillStyle = rage ? "#3a1020" : "#261a34";
+    ctx.strokeStyle = waveGlow ? "#ffd84d" : rage ? "#ff3b5c" : (this.tier>=3?"#ff9a45":"#ff5b7d");
+    ctx.lineWidth = rage ? 4 : 3;
     ctx.beginPath();ctx.moveTo(-72,30);ctx.lineTo(-48,-42);ctx.lineTo(-20,-58);ctx.lineTo(0,-38);ctx.lineTo(20,-58);ctx.lineTo(48,-42);ctx.lineTo(72,30);ctx.lineTo(35,18);ctx.lineTo(0,55);ctx.lineTo(-35,18);ctx.closePath();ctx.fill();ctx.stroke();
+    // Rage aura
+    if (rage) {
+      ctx.globalAlpha = 0.35 + 0.2 * Math.sin(this.ragePulse * 8);
+      ctx.strokeStyle = "#ff4f72";
+      ctx.lineWidth = 2;
+      ctx.beginPath();ctx.arc(0,0,78+Math.sin(this.ragePulse*6)*6,0,Math.PI*2);ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     ctx.fillStyle="#ff596f";for(const x of [-28,28]){ctx.beginPath();ctx.arc(x,-18,9,0,Math.PI*2);ctx.fill()}
     if(this.tier>=2){ctx.beginPath();ctx.arc(0,-22,7,0,Math.PI*2);ctx.fill()}
-    ctx.fillStyle="#53e8ff";ctx.fillRect(-16,-2,32,8);
+    ctx.fillStyle=rage?"#ff9a45":"#53e8ff";ctx.fillRect(-16,-2,32,8);
     if(this.tier>=3){ctx.fillStyle="#ffd84d";ctx.fillRect(-20,8,40,4)}
+    if(rage){
+      ctx.fillStyle="#ff4f72";
+      ctx.font="bold 11px system-ui";
+      ctx.textAlign="center";
+      ctx.fillText("RAGE",0,70);
+    }
     ctx.restore();
   }
 }

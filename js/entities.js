@@ -60,9 +60,37 @@ class Bullet{
   }
 }
 class EnemyBullet{
-  constructor(x,y,vx,vy,damage=12){this.x=x;this.y=y;this.vx=vx;this.vy=vy;this.damage=damage;this.r=6;this.dead=false}
-  update(dt){this.x+=this.vx*dt;this.y+=this.vy*dt;if(this.y>innerHeight+40||this.x<-40||this.x>innerWidth+40)this.dead=true}
-  draw(ctx){ctx.save();ctx.shadowBlur=14;ctx.shadowColor="#ff4f72";ctx.fillStyle="#ff7b91";ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fill();ctx.restore()}
+  constructor(x,y,vx,vy,damage=12,kind="normal"){
+    this.x=x;this.y=y;this.vx=vx;this.vy=vy;this.damage=damage;this.dead=false;
+    this.kind=kind;
+    this.r = kind === "wave" ? 9 : 6;
+    this.t = 0;
+  }
+  update(dt){
+    this.t += dt;
+    // Wave bullets gently oscillate sideways
+    if (this.kind === "wave") {
+      this.x += Math.sin(this.t * 6 + this.y * 0.02) * 35 * dt;
+    }
+    this.x+=this.vx*dt;this.y+=this.vy*dt;
+    if(this.y>innerHeight+40||this.x<-40||this.x>innerWidth+40)this.dead=true;
+  }
+  draw(ctx){
+    ctx.save();
+    if (this.kind === "wave") {
+      ctx.shadowBlur = 22;
+      ctx.shadowColor = "#ff9a45";
+      ctx.fillStyle = "#ffb86c";
+      ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle = "rgba(255,220,150,0.8)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();ctx.arc(this.x,this.y,this.r+3,0,Math.PI*2);ctx.stroke();
+    } else {
+      ctx.shadowBlur=14;ctx.shadowColor="#ff4f72";ctx.fillStyle="#ff7b91";
+      ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+  }
 }
 // Basic alien ship (replaces meteors) — slight drift, alien design
 class AlienShip {
@@ -409,6 +437,9 @@ class Boss{
     // Scales slowly: +2.5 per boss cleared
     this.bulletDmg = Math.round(11 + bossesKilled * 2.5);
     this.bulletSpeed = 145 + bossesKilled * 18;
+    // Super wave attack cooldown
+    this.waveTimer = 4.5 - Math.min(1.5, bossesKilled * 0.35);
+    this.waveFlash = 0;
   }
   update(dt, game){
     this.t += dt;
@@ -417,14 +448,62 @@ class Boss{
     this.x = innerWidth / 2 + Math.sin(this.t * (0.55 + this.tier * 0.04)) * sway;
     const third = this.maxHp / 3;
     this.phase = this.hp < third ? 3 : this.hp < third * 2 ? 2 : 1;
+    this.waveFlash = Math.max(0, this.waveFlash - dt);
     this.shotTimer -= dt;
     if (this.shotTimer <= 0) {
       this.shoot(game);
-      // Cooldowns: readable on boss 1, tighter later
       let baseCd = this.phase === 3 ? 0.55 : this.phase === 2 ? 0.85 : 1.15;
       if (this.tier === 1) baseCd *= 1.12;
       this.shotTimer = Math.max(0.34, baseCd / (0.9 + this.tier * 0.08));
     }
+    // Super wave (only after boss has entered the arena)
+    if (this.y >= 120) {
+      this.waveTimer -= dt;
+      if (this.waveTimer <= 0) {
+        this.shootWave(game);
+        this.waveFlash = 0.45;
+        // More frequent in later phases/tiers
+        let wcd = this.phase === 3 ? 3.2 : this.phase === 2 ? 4.0 : 5.0;
+        wcd /= (0.95 + this.tier * 0.08);
+        this.waveTimer = Math.max(2.4, wcd);
+        if (window.Sound && Sound.bossAppear) { /* soft cue */ }
+      }
+    }
+  }
+  shootWave(game){
+    // Screen-wide downward wave — super attack
+    const n = 11 + Math.min(6, this.tier);
+    const speed = this.bulletSpeed * 0.72;
+    const dmg = Math.max(9, Math.round(this.bulletDmg * 0.85));
+    const y0 = this.y + 50;
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0.5 : i / (n - 1);
+      const x = 30 + t * (innerWidth - 60);
+      // Slight aim toward player center bias
+      const drift = (game.player.x - innerWidth / 2) * 0.08;
+      const vx = (x - this.x) * 0.15 + drift;
+      const vy = speed + Math.sin(t * Math.PI) * 25;
+      game.enemyBullets.push(new EnemyBullet(this.x, y0, vx, vy, dmg, "wave"));
+    }
+    // Second delayed arc from sides for higher tiers
+    if (this.tier >= 2 && this.phase >= 2) {
+      for (let i = 0; i < 7; i++) {
+        const t = i / 6;
+        const a = Math.PI * 0.15 + t * Math.PI * 0.7; // lower hemisphere
+        game.enemyBullets.push(new EnemyBullet(
+          this.x, this.y + 30,
+          Math.cos(a) * speed * 0.9,
+          Math.sin(a) * speed * 0.9,
+          dmg, "wave"
+        ));
+      }
+    }
+    if (game.particles) {
+      game.particles.ring(this.x, this.y + 40, "#ff9a45", 90);
+      game.particles.burst(this.x, this.y + 40, "#ffb86c", 18, 160, { type: "circle" });
+    }
+    if (game.showMessage) game.showMessage("⚠ WAVE");
+    game.shake = Math.max(game.shake || 0, 0.35);
   }
   shoot(game){
     const base = Math.atan2(game.player.y - this.y, game.player.x - this.x);
@@ -461,8 +540,10 @@ class Boss{
     ctx.save();ctx.translate(this.x,this.y);
     const s=1+Math.min(0.2,(this.tier-1)*0.04);
     ctx.scale(s,s);
-    ctx.shadowBlur=35;ctx.shadowColor="#ff4f72";
-    ctx.fillStyle="#261a34";ctx.strokeStyle=this.tier>=3?"#ff9a45":"#ff5b7d";ctx.lineWidth=3;
+    const waveGlow = this.waveFlash > 0;
+    ctx.shadowBlur = waveGlow ? 50 : 35;
+    ctx.shadowColor = waveGlow ? "#ffd84d" : "#ff4f72";
+    ctx.fillStyle="#261a34";ctx.strokeStyle=waveGlow?"#ffd84d":(this.tier>=3?"#ff9a45":"#ff5b7d");ctx.lineWidth=3;
     ctx.beginPath();ctx.moveTo(-72,30);ctx.lineTo(-48,-42);ctx.lineTo(-20,-58);ctx.lineTo(0,-38);ctx.lineTo(20,-58);ctx.lineTo(48,-42);ctx.lineTo(72,30);ctx.lineTo(35,18);ctx.lineTo(0,55);ctx.lineTo(-35,18);ctx.closePath();ctx.fill();ctx.stroke();
     ctx.fillStyle="#ff596f";for(const x of [-28,28]){ctx.beginPath();ctx.arc(x,-18,9,0,Math.PI*2);ctx.fill()}
     if(this.tier>=2){ctx.beginPath();ctx.arc(0,-22,7,0,Math.PI*2);ctx.fill()}

@@ -28,10 +28,18 @@
       <div class="stars-title">✦ · ˚ · ✧ · ˚ · ✦</div>
       <h1>COSMIC<br><strong>RANGERS</strong></h1>
       <p class="subtitle">METEOR STRIKE</p>
+      <div class="control-pick" id="controlPick">
+        <p class="control-label">Управление</p>
+        <div class="control-options">
+          <button type="button" class="control-opt active" data-control="keyboard">⌨️ Клавиатура</button>
+          <button type="button" class="control-opt" data-control="mouse">🖱 Мышь</button>
+          <button type="button" class="control-opt" data-control="touch">📱 Сенсор</button>
+        </div>
+      </div>
       <button id="playBtn">PLAY</button>
       <button id="howBtn" class="secondary">HOW TO PLAY</button>
       <button id="muteBtn" class="secondary" style="min-width:120px;margin-top:8px">🔊 SOUND</button>
-      <p class="tip">WASD / ← ↑ → ↓ · SPACE · P · SHIFT · Q</p>
+      <p class="tip" id="controlTip">WASD / ← ↑ → ↓ · SPACE · P · SHIFT · Q</p>
     </section>
 
     <section id="pauseScreen" class="screen hidden">
@@ -54,7 +62,8 @@
     <section id="howScreen" class="screen hidden">
       <h2>КАК ИГРАТЬ</h2>
       <div class="how">
-        <p>🚀 <b>Движение:</b> WASD или стрелки</p>
+        <p>🚀 <b>Движение:</b> WASD / стрелки · мышь · сенсор</p>
+        <p>🖱 <b>Мышь:</b> курсор = корабль · ЛКМ = огонь · ПКМ = ускорение</p>
         <p>🔫 <b>Огонь:</b> SPACE или удерживай экранную кнопку</p>
         <p>⚡ <b>Ускорение:</b> SHIFT</p>
         <p>⏸️ <b>Пауза:</b> P</p>

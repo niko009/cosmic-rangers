@@ -303,10 +303,11 @@ class Game{
     this.score+=10000 + (this.bossesKilled || 0) * 2500;
     this.boss=null;
     this.bossesKilled = (this.bossesKilled || 0) + 1;
-    this.aggression = 1 + this.bossesKilled * 0.22;
+    // Soft-cap aggression: hard late game, still beatable toward boss 10
+    // 0→1.00, 1→1.15, 5→1.75, 9→2.35, 10+→2.35
+    this.aggression = Math.min(2.35, 1 + this.bossesKilled * 0.15);
     this.wave++;this.waveKills=0;this.waveTarget=7+this.wave*2;this.waveTimer=2.2;
 
-    // Base ship tier bump (visual + heal); tactical pick via menu
     this.upgradeShipTierBase();
 
     this.particles.burst(bx, by, "#ff4f72", 60, 420, { size: 5, type: "circle" });
@@ -318,6 +319,20 @@ class Game{
     this.flash = 0.5;
     this.flashColor = "#ff4f72";
     if(window.Sound) Sound.bossDie();
+
+    // Campaign clear: 10th boss = victory
+    if (this.bossesKilled >= 10) {
+      this.score += 50000;
+      this.showMessage("SECTOR CLEARED");
+      this.paused = true;
+      this.awaitingUpgrade = false;
+      // Brief celebration, then victory screen
+      setTimeout(() => {
+        if (this.won) return;
+        this.end(true);
+      }, 1600);
+      return;
+    }
 
     // Pause and open post-boss upgrade menu
     this.paused = true;

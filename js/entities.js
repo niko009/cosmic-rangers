@@ -425,8 +425,10 @@ class Boss{
     this.x = innerWidth / 2;
     this.y = -120;
     this.r = 74 + Math.min(18, bossesKilled * 3);
-    // HP: 200, 280, 370, 470...
-    this.hp = Math.floor(200 + bossesKilled * 85 + bossesKilled * bossesKilled * 5);
+    // HP with soft curve so boss 10 is tough but killable (~900-1000)
+    // k=0:200, 4:520, 9:920, 9 capped growth
+    const k = bossesKilled;
+    this.hp = Math.floor(200 + k * 75 + Math.min(k * k * 4, 280));
     this.maxHp = this.hp;
     this.dead = false;
     this.t = 0;
@@ -435,8 +437,9 @@ class Boss{
     this.shotTimer = 1.35 - Math.min(0.5, bossesKilled * 0.1);
     // Damage per bullet: 11 → ~9 hits to down 100 HP (armor 0)
     // Scales slowly: +2.5 per boss cleared
-    this.bulletDmg = Math.round(11 + bossesKilled * 2.5);
-    this.bulletSpeed = 145 + bossesKilled * 18;
+    // Damage soft-cap ~26 so armor+skill can survive
+    this.bulletDmg = Math.round(Math.min(26, 11 + bossesKilled * 1.7));
+    this.bulletSpeed = Math.min(280, 145 + bossesKilled * 14);
     // Super wave attack cooldown
     this.waveTimer = 4.5 - Math.min(1.5, bossesKilled * 0.35);
     this.waveFlash = 0;

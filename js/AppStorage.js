@@ -54,4 +54,18 @@ window.AppStorage = {
       if (next > cur) localStorage.setItem("cosmic-rangers-max-weapon-level", String(next));
     } catch (e) {}
   }
+,
+  getControlMode() {
+    try {
+      const m = localStorage.getItem("cosmic-rangers-control");
+      if (m === "mouse" || m === "touch" || m === "keyboard") return m;
+    } catch (e) {}
+    return "keyboard";
+  },
+  setControlMode(mode) {
+    try {
+      if (mode === "mouse" || mode === "touch" || mode === "keyboard")
+        localStorage.setItem("cosmic-rangers-control", mode);
+    } catch (e) {}
+  }
 };

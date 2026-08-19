@@ -8,7 +8,7 @@ class Game{
     this.spawnTimer=0;this.running=false;this.paused=false;this.won=false;this.shake=0;this.boost=false;
     this.flash=0;this.flashColor="#ff4f72";
     this.bossesKilled=0;this.aggression=1;
-    this.keys={};this.last=0;
+    this.keys={};this.last=0;this.controlMode="keyboard";this.mouse={x:0,y:0,down:false,right:false,active:false};
     addEventListener("resize",()=>this.resize());
   }
   resize(){this.canvas.width=innerWidth*devicePixelRatio;this.canvas.height=innerHeight*devicePixelRatio;this.ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);if(this.player)this.player.y=Math.min(innerHeight-80,this.player.y)}
@@ -110,22 +110,44 @@ class Game{
     this.particles.update(dt);
     const p=this.player;
     p.rapid=Math.max(0,p.rapid-dt);p.overcharge=Math.max(0,p.overcharge-dt);p.shield=Math.max(0,p.shield-dt);p.clone=Math.max(0,(p.clone||0)-dt);
-    const dx=(this.keys.ArrowRight||this.keys.KeyD?1:0)-(this.keys.ArrowLeft||this.keys.KeyA?1:0);
-    const dy=(this.keys.ArrowDown||this.keys.KeyS?1:0)-(this.keys.ArrowUp||this.keys.KeyW?1:0);
-    const len=Math.hypot(dx,dy)||1;
-    this.boost = !!(this.keys.ShiftLeft || this.keys.ShiftRight);
+    const mode = this.controlMode || "keyboard";
+    let moving = false;
+    this.boost = !!(this.keys.ShiftLeft || this.keys.ShiftRight || (mode === "mouse" && this.mouse.right));
     const tierSpeed = 1 + ((p.shipTier || 1) - 1) * 0.06;
     const speed = p.speed * tierSpeed * (this.boost ? 1.65 : 1);
-    p.x+=dx/len*speed*dt;p.y+=dy/len*speed*dt;p.x=Math.max(25,Math.min(innerWidth-25,p.x));p.y=Math.max(40,Math.min(innerHeight-35,p.y));
+
+    if (mode === "mouse" && this.mouse.active) {
+      // Smooth follow cursor
+      const tx = Math.max(25, Math.min(innerWidth - 25, this.mouse.x));
+      const ty = Math.max(40, Math.min(innerHeight - 35, this.mouse.y));
+      const dxm = tx - p.x, dym = ty - p.y;
+      const dist = Math.hypot(dxm, dym);
+      if (dist > 2) {
+        const step = Math.min(dist, speed * dt * 1.35);
+        p.x += (dxm / dist) * step;
+        p.y += (dym / dist) * step;
+        moving = true;
+      }
+    } else {
+      const dx=(this.keys.ArrowRight||this.keys.KeyD?1:0)-(this.keys.ArrowLeft||this.keys.KeyA?1:0);
+      const dy=(this.keys.ArrowDown||this.keys.KeyS?1:0)-(this.keys.ArrowUp||this.keys.KeyW?1:0);
+      const len=Math.hypot(dx,dy)||1;
+      if (dx || dy) {
+        p.x+=dx/len*speed*dt;p.y+=dy/len*speed*dt;
+        moving = true;
+      }
+      p.x=Math.max(25,Math.min(innerWidth-25,p.x));p.y=Math.max(40,Math.min(innerHeight-35,p.y));
+    }
+    p.x=Math.max(25,Math.min(innerWidth-25,p.x));p.y=Math.max(40,Math.min(innerHeight-35,p.y));
 
     // Engine trail particles
-    if (dx !== 0 || dy !== 0 || this.boost) {
+    if (moving || this.boost) {
       const thrusterColor = this.boost ? "#ff9d4d" : "#53e8ff";
       const count = this.boost ? 5 : 2;
       this.particles.trail(p.x, p.y + 18, Math.PI / 2, thrusterColor, count, this.boost ? 180 : 90);
     }
 
-    const firing=this.keys.Space||this.touchFire;
+    const firing=this.keys.Space||this.touchFire||(mode==="mouse"&&this.mouse.down);
     p.fire-=dt;
     if(firing&&p.fire<=0)this.shoot();
     for(const b of this.bullets)b.update(dt, this);

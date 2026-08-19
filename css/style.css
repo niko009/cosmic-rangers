@@ -42,3 +42,10 @@ button.secondary{background:rgba(15,20,40,.85);border-color:#39405f}
 .upgrade-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:420px;width:90%;margin:0 auto}
 .upgrade-btn{min-width:0;width:100%;padding:12px 10px;font-size:13px;letter-spacing:1px;margin:0}
 @media(max-width:500px){.upgrade-grid{grid-template-columns:1fr}}
+
+.control-pick{margin:14px 0 8px;text-align:center}
+.control-label{font-size:12px;letter-spacing:2px;opacity:.7;margin-bottom:8px;text-transform:uppercase}
+.control-options{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:420px;margin:0 auto}
+.control-opt{min-width:0;padding:10px 12px;font-size:12px;letter-spacing:1px;margin:0;background:rgba(10,20,40,.7);border:1px solid rgba(83,232,255,.35);color:#cfefff}
+.control-opt.active{background:linear-gradient(180deg,#1a4a6a,#0d2a44);border-color:#53e8ff;box-shadow:0 0 12px rgba(83,232,255,.35);color:#fff}
+.control-opt:hover{border-color:#53e8ff}

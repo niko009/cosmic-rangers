@@ -27,6 +27,30 @@ const gameOver = document.getElementById("gameOver");
 const hud = document.getElementById("hud");
 const touch = document.getElementById("touchControls");
 const upgradeScreen = document.getElementById("upgradeScreen");
+
+const controlTip = document.getElementById("controlTip");
+const TIPS = {
+  keyboard: "WASD / ← ↑ → ↓ · SPACE · P · SHIFT · Q",
+  mouse: "Мышь = корабль · ЛКМ огонь · ПКМ ускорение · P · Q",
+  touch: "Сенсорные кнопки на экране · огонь справа"
+};
+function applyControlMode(mode) {
+  game.controlMode = mode;
+  if (typeof AppStorage !== "undefined") AppStorage.setControlMode(mode);
+  document.querySelectorAll(".control-opt").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-control") === mode);
+  });
+  if (controlTip) controlTip.textContent = TIPS[mode] || TIPS.keyboard;
+}
+// restore saved mode
+applyControlMode(typeof AppStorage !== "undefined" ? AppStorage.getControlMode() : "keyboard");
+document.querySelectorAll(".control-opt").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (window.Sound) Sound.ui();
+    applyControlMode(btn.getAttribute("data-control"));
+  });
+});
+
 const touchFire = document.getElementById("touchFire");
 
 const ui = {
@@ -109,7 +133,11 @@ const ui = {
     [this.menu, this.gameOver, this.howScreen, this.pauseScreen].forEach(x => x.classList.add("hidden"));
     if (upgradeScreen) upgradeScreen.classList.add("hidden");
     this.hud.classList.remove("hidden");
-    this.touch.classList.remove("hidden");
+    if (game.controlMode === "touch") this.touch.classList.remove("hidden");
+    else this.touch.classList.add("hidden");
+    // mouse cursor style on canvas
+    const canvas = document.getElementById("game");
+    if (canvas) canvas.style.cursor = game.controlMode === "mouse" ? "crosshair" : "default";
     game.start();
   },
   pause(on) {
@@ -238,3 +266,37 @@ document.querySelectorAll("#upgradeChoices [data-upgrade]").forEach(btn => {
     game.applyBossUpgrade(choice);
   });
 });
+
+
+// Mouse controls
+const gameCanvas = document.getElementById("game");
+function updateMousePos(e) {
+  if (!gameCanvas) return;
+  const r = gameCanvas.getBoundingClientRect();
+  game.mouse.x = ((e.clientX - r.left) / r.width) * innerWidth;
+  game.mouse.y = ((e.clientY - r.top) / r.height) * innerHeight;
+  game.mouse.active = true;
+}
+if (gameCanvas) {
+  gameCanvas.addEventListener("mousemove", e => {
+    if (game.controlMode !== "mouse") return;
+    updateMousePos(e);
+  });
+  gameCanvas.addEventListener("pointerdown", e => {
+    if (game.controlMode !== "mouse") return;
+    updateMousePos(e);
+    if (e.button === 0) game.mouse.down = true;
+    if (e.button === 2) game.mouse.right = true;
+  });
+  gameCanvas.addEventListener("pointerup", e => {
+    if (e.button === 0) game.mouse.down = false;
+    if (e.button === 2) game.mouse.right = false;
+  });
+  gameCanvas.addEventListener("pointerleave", () => {
+    game.mouse.down = false;
+    game.mouse.right = false;
+  });
+  gameCanvas.addEventListener("contextmenu", e => {
+    if (game.controlMode === "mouse") e.preventDefault();
+  });
+}

@@ -49,3 +49,6 @@ button.secondary{background:rgba(15,20,40,.85);border-color:#39405f}
 .control-opt{min-width:0;padding:10px 12px;font-size:12px;letter-spacing:1px;margin:0;background:rgba(10,20,40,.7);border:1px solid rgba(83,232,255,.35);color:#cfefff}
 .control-opt.active{background:linear-gradient(180deg,#1a4a6a,#0d2a44);border-color:#53e8ff;box-shadow:0 0 12px rgba(83,232,255,.35);color:#fff}
 .control-opt:hover{border-color:#53e8ff}
+
+#gameVersion{position:fixed;left:10px;bottom:8px;z-index:5;pointer-events:none;
+  font-size:10px;letter-spacing:1px;color:rgba(120,140,170,.28);font-family:system-ui,sans-serif}

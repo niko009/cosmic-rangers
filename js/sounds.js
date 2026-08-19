@@ -113,6 +113,24 @@ window.Sound = (() => {
         setTimeout(() => tone(784, "sine", 0.3, 0.15, 0, 0.02, 0.15), 100);
       }, 400);
     },
+    bossRage() {
+      // Dramatic rage enter: rising dissonance + roar
+      noise(0.55, 0.32, 500);
+      tone(70, "sawtooth", 0.5, 0.28, 0, 0.02, 0.35);
+      setTimeout(() => tone(95, "sawtooth", 0.45, 0.24, 0, 0.02, 0.3), 80);
+      setTimeout(() => tone(140, "square", 0.35, 0.18, 0, 0.01, 0.25), 160);
+      setTimeout(() => {
+        tone(180, "sawtooth", 0.25, 0.2, 0, 0.01, 0.2);
+        noise(0.3, 0.2, 900);
+      }, 280);
+      setTimeout(() => tone(55, "triangle", 0.7, 0.22, 0, 0.05, 0.5), 200);
+    },
+    bossWave() {
+      // Whoosh + low pulse for wave attack
+      noise(0.35, 0.22, 700);
+      tone(120, "sine", 0.3, 0.16, 0, 0.02, 0.2);
+      setTimeout(() => tone(90, "sawtooth", 0.25, 0.14, 0, 0.01, 0.18), 60);
+    },
     gameOver() {
       tone(330, "triangle", 0.4, 0.18, 0, 0.05, 0.3);
       setTimeout(() => tone(262, "triangle", 0.5, 0.16, 0, 0.05, 0.35), 200);

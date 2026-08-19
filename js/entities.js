@@ -464,7 +464,8 @@ class Boss{
         game.flashColor = "#ff4f72";
         this.waveTimer = Math.min(this.waveTimer, 0.8);
         this.shotTimer = Math.min(this.shotTimer, 0.25);
-        if (window.Sound && Sound.bossAppear) Sound.bossAppear();
+        if (window.Sound && Sound.bossRage) Sound.bossRage();
+        else if (window.Sound && Sound.bossAppear) Sound.bossAppear();
       }
     }
     this.ragePulse = this.enraged ? this.ragePulse + dt : 0;
@@ -531,6 +532,7 @@ class Boss{
     }
     if (game.showMessage) game.showMessage("⚠ WAVE");
     game.shake = Math.max(game.shake || 0, 0.35);
+    if (window.Sound && Sound.bossWave) Sound.bossWave();
   }
   shoot(game){
     const base = Math.atan2(game.player.y - this.y, game.player.x - this.x);

@@ -391,42 +391,69 @@ class PowerUp{
 }
 class Boss{
   constructor(bossesKilled = 0){
+    // Balanced so first boss is fair at weapon LV.1 / 100 HP
+    // Later bosses ramp HP and pressure without one-shots
     this.tier = bossesKilled + 1;
-    const scale = 1 + bossesKilled * 0.35;
-    this.x=innerWidth/2;this.y=-120;this.r=74+Math.min(20,bossesKilled*4);
-    this.hp=Math.floor(220*scale);this.maxHp=this.hp;
-    this.dead=false;this.t=0;this.shotTimer=Math.max(0.35,1-bossesKilled*0.08);this.phase=1;
-    this.bulletSpeed=180+bossesKilled*25;
-    this.bulletDmg=Math.ceil(18+bossesKilled*4);
+    this.x = innerWidth / 2;
+    this.y = -120;
+    this.r = 74 + Math.min(18, bossesKilled * 3);
+    // HP: 200, 280, 370, 470...
+    this.hp = Math.floor(200 + bossesKilled * 85 + bossesKilled * bossesKilled * 5);
+    this.maxHp = this.hp;
+    this.dead = false;
+    this.t = 0;
+    this.phase = 1;
+    // First shot delay — time to read the pattern
+    this.shotTimer = 1.35 - Math.min(0.5, bossesKilled * 0.1);
+    // Damage per bullet: 11 → ~9 hits to down 100 HP (armor 0)
+    // Scales slowly: +2.5 per boss cleared
+    this.bulletDmg = Math.round(11 + bossesKilled * 2.5);
+    this.bulletSpeed = 145 + bossesKilled * 18;
   }
-  update(dt,game){
-    this.t+=dt;
-    this.y=Math.min(125,this.y+100*dt);
-    const sway = Math.min(260,innerWidth*.32)*(1+Math.min(0.3,(this.tier-1)*0.08));
-    this.x=innerWidth/2+Math.sin(this.t*(.7+this.tier*0.05))*sway;
-    const third=this.maxHp/3;
-    this.phase=this.hp<third?3:this.hp<third*2?2:1;
-    this.shotTimer-=dt;
-    if(this.shotTimer<=0){
+  update(dt, game){
+    this.t += dt;
+    this.y = Math.min(125, this.y + 95 * dt);
+    const sway = Math.min(240, innerWidth * 0.30) * (1 + Math.min(0.25, (this.tier - 1) * 0.07));
+    this.x = innerWidth / 2 + Math.sin(this.t * (0.55 + this.tier * 0.04)) * sway;
+    const third = this.maxHp / 3;
+    this.phase = this.hp < third ? 3 : this.hp < third * 2 ? 2 : 1;
+    this.shotTimer -= dt;
+    if (this.shotTimer <= 0) {
       this.shoot(game);
-      const baseCd=this.phase===3?.45:this.phase===2?.75:1.05;
-      this.shotTimer=Math.max(0.28,baseCd/(0.85+this.tier*0.1));
+      // Cooldowns: readable on boss 1, tighter later
+      let baseCd = this.phase === 3 ? 0.55 : this.phase === 2 ? 0.85 : 1.15;
+      if (this.tier === 1) baseCd *= 1.12;
+      this.shotTimer = Math.max(0.34, baseCd / (0.9 + this.tier * 0.08));
     }
   }
   shoot(game){
-    const base=Math.atan2(game.player.y-this.y,game.player.x-this.x);
-    let count=this.phase===1?3:this.phase===2?5:7;
-    count=Math.min(11,count+Math.floor((this.tier-1)/2));
-    const spread=this.phase===3?.65:.45;
-    for(let i=0;i<count;i++){
-      const a=base+(i-(count-1)/2)*(spread/(count-1||1));
-      game.enemyBullets.push(new EnemyBullet(this.x,this.y+45,Math.cos(a)*this.bulletSpeed,Math.sin(a)*this.bulletSpeed,this.bulletDmg));
+    const base = Math.atan2(game.player.y - this.y, game.player.x - this.x);
+    // Bullet counts stay moderate on first boss
+    let count = this.phase === 1 ? 3 : this.phase === 2 ? 4 : 5;
+    if (this.tier >= 2) count += 1;
+    if (this.tier >= 4) count += 1;
+    count = Math.min(9, count);
+    const spread = this.phase === 3 ? 0.55 : 0.4;
+    for (let i = 0; i < count; i++) {
+      const a = base + (i - (count - 1) / 2) * (spread / (count - 1 || 1));
+      game.enemyBullets.push(new EnemyBullet(
+        this.x, this.y + 45,
+        Math.cos(a) * this.bulletSpeed,
+        Math.sin(a) * this.bulletSpeed,
+        this.bulletDmg
+      ));
     }
-    // Extra ring shot at high tier phase 3
-    if(this.tier>=3 && this.phase===3 && Math.random()<0.4){
-      for(let i=0;i<8;i++){
-        const a=(i/8)*Math.PI*2;
-        game.enemyBullets.push(new EnemyBullet(this.x,this.y,Math.cos(a)*this.bulletSpeed*0.7,Math.sin(a)*this.bulletSpeed*0.7,this.bulletDmg));
+    // Full ring only from 3rd boss onward, phase 3, lower damage
+    if (this.tier >= 3 && this.phase === 3 && Math.random() < 0.32) {
+      const ringDmg = Math.max(8, Math.round(this.bulletDmg * 0.7));
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        game.enemyBullets.push(new EnemyBullet(
+          this.x, this.y,
+          Math.cos(a) * this.bulletSpeed * 0.65,
+          Math.sin(a) * this.bulletSpeed * 0.65,
+          ringDmg
+        ));
       }
     }
   }

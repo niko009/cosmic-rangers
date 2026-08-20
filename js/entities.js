@@ -342,7 +342,7 @@ class HomingDrone {
     this.turnSpeed = 90 + wave * 5;
     this.aggro = aggro;
     this.bulletSpeed = 160 * (0.9 + aggro * 0.2);
-    this.bulletDmg = Math.ceil(9 * aggro);
+    this.bulletDmg = Math.ceil(9.5 * aggro);
   }
   update(dt, game) {
     this.t += dt;
@@ -428,20 +428,20 @@ class Boss{
     // HP with soft curve so boss 10 is tough but killable (~900-1000)
     // k=0:200, 4:520, 9:920, 9 capped growth
     const k = bossesKilled;
-    this.hp = Math.floor(180 + k * 68 + Math.min(k * k * 3.5, 250));
+    this.hp = Math.floor(190 + k * 72 + Math.min(k * k * 3.7, 265));
     this.maxHp = this.hp;
     this.dead = false;
     this.t = 0;
     this.phase = 1;
     // First shot delay — time to read the pattern
-    this.shotTimer = 1.55 - Math.min(0.45, bossesKilled * 0.08);
+    this.shotTimer = 1.45 - Math.min(0.48, bossesKilled * 0.09);
     // Damage per bullet: 11 → ~9 hits to down 100 HP (armor 0)
     // Scales slowly: +2.5 per boss cleared
     // Damage soft-cap ~26 so armor+skill can survive
-    this.bulletDmg = Math.round(Math.min(24, 10 + bossesKilled * 1.5));
-    this.bulletSpeed = Math.min(260, 130 + bossesKilled * 13);
+    this.bulletDmg = Math.round(Math.min(25, 10.5 + bossesKilled * 1.6));
+    this.bulletSpeed = Math.min(270, 138 + bossesKilled * 13.5);
     // Super wave attack cooldown
-    this.waveTimer = 5.2 - Math.min(1.4, bossesKilled * 0.3);
+    this.waveTimer = 4.9 - Math.min(1.45, bossesKilled * 0.32);
     this.waveFlash = 0;
     this.enraged = false;
     this.rageAnnounced = false;
@@ -483,10 +483,10 @@ class Boss{
     this.shotTimer -= dt * rageMul;
     if (this.shotTimer <= 0) {
       this.shoot(game);
-      let baseCd = this.phase === 3 ? 0.62 : this.phase === 2 ? 0.95 : 1.28;
-      if (this.tier === 1) baseCd *= 1.2;
+      let baseCd = this.phase === 3 ? 0.58 : this.phase === 2 ? 0.90 : 1.22;
+      if (this.tier === 1) baseCd *= 1.15;
       if (this.enraged) baseCd *= 0.55;
-      this.shotTimer = Math.max(0.28, baseCd / (0.9 + this.tier * 0.08));
+      this.shotTimer = Math.max(0.25, baseCd / (0.9 + this.tier * 0.08));
     }
     // Super wave (only after boss has entered the arena)
     if (this.y >= 120) {
@@ -494,11 +494,11 @@ class Boss{
       if (this.waveTimer <= 0) {
         this.shootWave(game);
         this.waveFlash = 0.45;
-        let wcd = this.phase === 3 ? 3.6 : this.phase === 2 ? 4.5 : 5.6;
+        let wcd = this.phase === 3 ? 3.4 : this.phase === 2 ? 4.2 : 5.3;
         wcd /= (0.95 + this.tier * 0.08);
         if (this.enraged) wcd *= 0.6;
-        if (this.tier === 1) wcd *= 1.15;
-        this.waveTimer = Math.max(2.0, wcd);
+        if (this.tier === 1) wcd *= 1.1;
+        this.waveTimer = Math.max(1.8, wcd);
       }
     }
   }
@@ -506,7 +506,7 @@ class Boss{
     // Screen-wide downward wave — super attack
     const n = 11 + Math.min(6, this.tier) + (this.enraged ? 4 : 0);
     const speed = this.bulletSpeed * (this.enraged ? 0.85 : 0.72);
-    const dmg = Math.max(8, Math.round(this.bulletDmg * (this.enraged ? 1.0 : 0.8)));
+    const dmg = Math.max(8, Math.round(this.bulletDmg * (this.enraged ? 1.0 : 0.82)));
     const y0 = this.y + 50;
     for (let i = 0; i < n; i++) {
       const t = n === 1 ? 0.5 : i / (n - 1);

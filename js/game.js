@@ -206,7 +206,7 @@ class Game{
       angles = w.angles.slice();
     }
     let speed = 620;
-    let damage = 1 * w.dmgMul;
+    let damage = 1.05 * w.dmgMul;
     let fireRate = (p.rapid > 0 ? 0.075 : 0.18) / w.rateMul;
 
     // Rebalanced DPS (approx equal at LV3, different roles)
@@ -305,7 +305,7 @@ class Game{
     this.bossesKilled = (this.bossesKilled || 0) + 1;
     // Soft-cap aggression: hard late game, still beatable toward boss 10
     // 0→1.00, 1→1.15, 5→1.75, 9→2.35, 10+→2.35
-    this.aggression = Math.min(2.35, 1 + this.bossesKilled * 0.15);
+    this.aggression = Math.min(2.28, 1 + this.bossesKilled * 0.14);
     this.wave++;this.waveKills=0;this.waveTarget=7+this.wave*2;this.waveTimer=2.2;
 
     this.upgradeShipTierBase();
@@ -417,7 +417,7 @@ class Game{
       for(const s of ships){
         if(Math.hypot(m.x-s.x,m.y-s.y)<m.r+s.r){
           m.dead=true;
-          const dmg = m.big ? 28 : (m.kind ? 22 : 18);
+          const dmg = m.big ? 26 : (m.kind ? 21 : 17);
           this.damage(dmg);
           this.particles.burst(m.x,m.y, m.kind==="drone"?"#c45cff":"#9b7a92", 22, 200, {size:3});
           break;
@@ -459,7 +459,7 @@ class Game{
     }
   }
   onEnemyLeaked(m){
-    const dmg = m.big ? 22 : (m.kind === "drone" ? 16 : m.kind ? 14 : 12);
+    const dmg = m.big ? 21 : (m.kind === "drone" ? 15 : m.kind ? 13 : 11);
     this.damage(dmg);
     this.flash = Math.max(this.flash, 0.25);
     this.flashColor = "#ff9a45";
